@@ -744,9 +744,13 @@
   .g-time-header-sticky { position: sticky; top: 0; z-index: 5; background: var(--bg); }
 
   .g-time-rows { display: flex; flex-direction: column; min-width: fit-content; }
-  .g-time-row-pair { border-bottom: 1px solid var(--line); }
+  /* Lock pair height to exactly match .g-loc (72px + 1px border = 73px) to
+     prevent row-by-row drift between the location column and the Gantt. */
+  .g-time-row-pair { height: 72px; box-sizing: border-box; border-bottom: 1px solid var(--line); }
   .g-time-row { display: flex; height: 36px; }
-  .g-time-row.overlay { border-top: 1px solid var(--line); }
+  /* Use inset box-shadow instead of border-top so the divider is visible but
+     doesn't add 1px to the overlay row's height. */
+  .g-time-row.overlay { box-shadow: inset 0 1px 0 var(--line); }
 
   .g-cell {
     height: 36px;
@@ -786,6 +790,47 @@
     transition: opacity 120ms ease;
   }
   .g-cell:hover .g-cell-empty-plus { opacity: 0.8; }
+
+  /* Campaign-name tooltip on cell hover. Desktop only — media query gates to
+     devices that support pointer hover, so it doesn't misfire on mobile taps. */
+  @media (hover: hover) and (pointer: fine) {
+    .g-cell[data-tooltip]:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surf-3);
+      color: var(--text);
+      border: 1px solid var(--line-2);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: var(--ff);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 10;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+      text-shadow: none;
+      animation: tooltipIn 120ms ease-out;
+    }
+    .g-cell[data-tooltip]:hover::before {
+      content: "";
+      position: absolute;
+      bottom: calc(100% + 1px);
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: var(--line-2);
+      pointer-events: none;
+      z-index: 10;
+    }
+  }
+  @keyframes tooltipIn {
+    from { opacity: 0; transform: translate(-50%, 4px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
 
   .gantt-legend {
     display: flex; gap: 16px; flex-wrap: wrap;
@@ -1306,14 +1351,17 @@ function allLocations() {
     if (L.isBaseOverride) overrides.set(L.id, L);
     else additions.push(L);
   }
-  const bases = BASE_LOCATIONS.map(B => {
-    if (overrides.has(B.id)) {
-      // Merge so any missing fields in the override fall back to the base
-      return Object.assign({}, B, overrides.get(B.id));
-    }
-    return B;
-  });
-  return bases.concat(additions);
+  const hidden = new Set(state.hiddenLocationIds || []);
+  const bases = BASE_LOCATIONS
+    .filter(B => !hidden.has(B.id))
+    .map(B => {
+      if (overrides.has(B.id)) {
+        // Merge so any missing fields in the override fall back to the base
+        return Object.assign({}, B, overrides.get(B.id));
+      }
+      return B;
+    });
+  return bases.concat(additions.filter(L => !hidden.has(L.id)));
 }
 
 // Is this location a base location (not user-added)? Used to decide Delete vs Revert in the editor.
@@ -1346,6 +1394,7 @@ const STORAGE_KEY = "ooh_dash_v2";
 const state = {
   campaigns: [],
   userLocations: [],
+  hiddenLocationIds: [],   // Base-location IDs the user has "deleted" — filtered out of allLocations()
   schedule: {},
   filter: { city: "all", screen: "all", campaign: "all" },
   campSearch: "",
@@ -1378,6 +1427,7 @@ function loadState() {
         return { ...rest, country, cities };
       });
     }
+    if (Array.isArray(obj.hiddenLocationIds)) state.hiddenLocationIds = obj.hiddenLocationIds;
     if (obj.schedule && typeof obj.schedule === "object") {
       const base = emptySchedule();
       for (const k of Object.keys(obj.schedule)) {
@@ -1396,6 +1446,7 @@ function saveStateLocal() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       campaigns: state.campaigns,
       userLocations: state.userLocations,
+      hiddenLocationIds: state.hiddenLocationIds,
       schedule: state.schedule,
     }));
   } catch (e) {
@@ -1567,6 +1618,7 @@ function writePlanToFirebase() {
   const payload = {
     campaigns: state.campaigns,
     userLocations: state.userLocations,
+    hiddenLocationIds: state.hiddenLocationIds,
     schedule: scheduleForFirebase(state.schedule),
     _updatedAt: firebase.database.ServerValue.TIMESTAMP,
     _updatedBy: sessionId || "anon",
@@ -1616,6 +1668,9 @@ function applyRemoteSnapshot(remote) {
     }
     if (Object.prototype.hasOwnProperty.call(remote, "userLocations") && remote.userLocations != null) {
       state.userLocations = asArray(remote.userLocations);
+    }
+    if (Object.prototype.hasOwnProperty.call(remote, "hiddenLocationIds") && remote.hiddenLocationIds != null) {
+      state.hiddenLocationIds = asArray(remote.hiddenLocationIds);
     }
 
     if (remote.schedule && typeof remote.schedule === "object") {
@@ -2079,6 +2134,13 @@ function makeRowCells(location, track, plan, weekW) {
         label.textContent = camp.name;
         cell.appendChild(label);
 
+        // Tooltip showing the campaign name on desktop hover. Week range is
+        // appended for context when the run spans multiple weeks.
+        const startLabel = MONTHS[Math.floor(i / 4)] + " W" + ((i % 4) + 1);
+        const endLabel = MONTHS[Math.floor((j - 1) / 4)] + " W" + (((j - 1) % 4) + 1);
+        const rangeLabel = runLen === 1 ? startLabel : (startLabel + " → " + endLabel);
+        cell.dataset.tooltip = camp.name + " · " + rangeLabel;
+
         // Month-boundary ticks inside the merged cell (subtle)
         for (let k = 1; k < runLen; k++) {
           const absWeek = i + k;
@@ -2319,7 +2381,12 @@ function openCampaignPicker(locId, track, weekIdx) {
     wrap.querySelector("#mx-close").addEventListener("click", closeModal);
     wrap.querySelector("#mx-cancel").addEventListener("click", closeModal);
     const searchEl = wrap.querySelector("#mx-search");
-    searchEl.focus();
+    // Only autofocus the search on devices with a physical keyboard. Focusing
+    // on touch devices pops up the on-screen keyboard, which covers the
+    // campaign list and is disruptive — especially since the list is usually
+    // short enough to scan without searching.
+    const hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+    if (hasFinePointer) searchEl.focus();
     searchEl.addEventListener("input", (e) => { searchQ = e.target.value; render(); setTimeout(()=>wrap.querySelector("#mx-search").focus(), 0); });
     wrap.querySelectorAll(".picker-row").forEach(r => {
       r.addEventListener("click", () => {
@@ -2790,12 +2857,9 @@ function openLocationEditor(existing) {
         '</div>' +
 
         '<div class="modal-foot">' +
-          (isNew ? '' :
-            (editingBase && !hasOverride
-              ? ''  // no override exists yet — nothing to revert, so hide the button entirely
-              : '<button class="btn-danger" id="lx-del"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="margin-right:4px;vertical-align:-2px;"><path d="M3 5h10M6 5V3h4v2M5 5l.5 8h5l.5-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>' + deleteLabel + '</button>')) +
           '<span style="flex: 1;"></span>' +
           '<button class="btn-secondary" id="lx-cancel">Cancel</button>' +
+          (isNew ? '' : '<button class="btn-danger" id="lx-del"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="margin-right:4px;vertical-align:-2px;"><path d="M3 5h10M6 5V3h4v2M5 5l.5 8h5l.5-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Delete</button>') +
           '<button class="btn-primary" id="lx-save">' + (isNew ? "Add location" : "Save") + '</button>' +
         '</div>' +
       '</div>';
@@ -2924,27 +2988,28 @@ function openLocationEditor(existing) {
     const delBtn = wrap.querySelector("#lx-del");
     if (delBtn) delBtn.addEventListener("click", () => {
       const editingBase = isBaseLocationId(existing.id);
-      const isOverride = editingBase && state.userLocations.some(L => L.id === existing.id && L.isBaseOverride);
+      if (!confirm('Delete "' + existing.name + '"?\n\nThis will remove the location from the dashboard for all users. Any campaigns scheduled against it will be cleared.')) return;
+
       if (editingBase) {
-        // Base locations: "Revert to default" — remove any override, don't delete schedule
-        if (!isOverride) return;  // nothing to revert
-        if (!confirm('Revert "' + existing.name + '" to its default settings? Your customisations will be lost. Scheduled campaigns on this location are preserved.')) return;
+        // Base locations are hardcoded and can't be deleted from BASE_LOCATIONS.
+        // Track them as "hidden" so allLocations() filters them out everywhere.
+        // Also drop any override for this id, and clear its schedule entries.
+        if (!state.hiddenLocationIds.includes(existing.id)) {
+          state.hiddenLocationIds = [...state.hiddenLocationIds, existing.id];
+        }
         state.userLocations = state.userLocations.filter(L => !(L.id === existing.id && L.isBaseOverride));
-        saveState();
-        closeModal();
-        rerenderAll();
-        toast("Reverted to default");
       } else {
-        // User-added location: true delete, clears schedule
-        if (!confirm('Delete "' + existing.name + '"? Any campaigns scheduled for this location will also be cleared.')) return;
+        // User-added location — actually remove from state.userLocations
         state.userLocations = state.userLocations.filter(L => L.id !== existing.id);
-        delete state.schedule[cellKey(existing.id, "main")];
-        delete state.schedule[cellKey(existing.id, "overlay")];
-        saveState();
-        closeModal();
-        rerenderAll();
-        toast("Location removed");
       }
+      // Clear schedule for this location in all cases
+      delete state.schedule[cellKey(existing.id, "main")];
+      delete state.schedule[cellKey(existing.id, "overlay")];
+
+      saveState();
+      closeModal();
+      rerenderAll();
+      toast("Location deleted");
     });
   };
 
