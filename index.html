@@ -1480,7 +1480,7 @@
 
   <footer class="footer">
     <span>2026 OOH Annual Plan · DCT Abu Dhabi SM&amp;C</span>
-    <span>Data auto-saved locally · click any weekly cell to allocate</span>
+    <span>Data auto-saved · click any weekly cell to allocate</span>
   </footer>
 </div>
 
@@ -2519,7 +2519,13 @@ function openRangePicker(locId, track, startWeek, endWeek) {
     const searchEl = wrap.querySelector("#mx-search");
     const hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
     if (hasFinePointer) searchEl.focus();
-    searchEl.addEventListener("input", (e) => { searchQ = e.target.value; render(); });
+    searchEl.addEventListener("input", (e) => {
+      const caret = e.target.selectionStart;
+      searchQ = e.target.value;
+      render();
+      const fresh = wrap.querySelector("#mx-search");
+      if (fresh) { fresh.focus(); try { fresh.setSelectionRange(caret, caret); } catch (_) {} }
+    });
 
     wrap.querySelectorAll(".picker-row").forEach(r => {
       r.addEventListener("click", () => {
@@ -2638,7 +2644,13 @@ function openAddCampaignRange(locId, track) {
       const searchEl = wrap.querySelector("#ax-search");
       const hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
       if (hasFinePointer) searchEl.focus();
-      searchEl.addEventListener("input", (e) => { searchQ = e.target.value; render(); });
+      searchEl.addEventListener("input", (e) => {
+        const caret = e.target.selectionStart;
+        searchQ = e.target.value;
+        render();
+        const fresh = wrap.querySelector("#ax-search");
+        if (fresh) { fresh.focus(); try { fresh.setSelectionRange(caret, caret); } catch (_) {} }
+      });
       wrap.querySelectorAll(".picker-row").forEach(r => {
         r.addEventListener("click", () => {
           draft.campId = r.dataset.id;
@@ -2986,7 +2998,13 @@ function openCampaignPicker(locId, track, weekIdx) {
     // short enough to scan without searching.
     const hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
     if (hasFinePointer) searchEl.focus();
-    searchEl.addEventListener("input", (e) => { searchQ = e.target.value; render(); setTimeout(()=>wrap.querySelector("#mx-search").focus(), 0); });
+    searchEl.addEventListener("input", (e) => {
+      const caret = e.target.selectionStart;
+      searchQ = e.target.value;
+      render();
+      const fresh = wrap.querySelector("#mx-search");
+      if (fresh) { fresh.focus(); try { fresh.setSelectionRange(caret, caret); } catch (_) {} }
+    });
     wrap.querySelectorAll(".picker-row").forEach(r => {
       r.addEventListener("click", () => {
         const id = r.dataset.id;
