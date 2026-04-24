@@ -1326,20 +1326,15 @@
   <!-- ======== FILTERS ======== -->
   <section class="filters fade-up" style="animation-delay: 40ms;">
     <div class="filter-group">
-      <label class="filter-label" for="filter-city">Market</label>
-      <select id="filter-city" class="filter-select">
-        <option value="all">All cities</option>
-        <option value="Dubai">Dubai</option>
-        <option value="Abu Dhabi">Abu Dhabi</option>
-        <option value="AD + DXB">AD + DXB</option>
+      <label class="filter-label" for="filter-country">Country</label>
+      <select id="filter-country" class="filter-select">
+        <option value="all">All countries</option>
       </select>
     </div>
     <div class="filter-group">
-      <label class="filter-label" for="filter-screen">Screen type</label>
-      <select id="filter-screen" class="filter-select">
-        <option value="all">All screens</option>
-        <option value="Digital">Digital</option>
-        <option value="Static">Static</option>
+      <label class="filter-label" for="filter-city">City</label>
+      <select id="filter-city" class="filter-select">
+        <option value="all">All cities</option>
       </select>
     </div>
     <div class="filter-group">
@@ -1598,7 +1593,7 @@ const state = {
   userLocations: [],
   hiddenLocationIds: [],   // Base-location IDs the user has "deleted" — filtered out of allLocations()
   schedule: {},
-  filter: { city: "all", screen: "all", campaign: "all" },
+  filter: { country: "all", city: "all", campaign: "all" },
   campSearch: "",
 };
 
@@ -2015,13 +2010,78 @@ function getCampaignUsage() {
   }
   return map;
 }
+/* ============================================================
+   FILTER URL SYNC
+   ============================================================
+   Serialise the current filter state into ?country=...&city=...&campaign=...
+   so people can share a pre-filtered view. Filters set to "all" are omitted
+   to keep URLs clean. We use history.replaceState so filter changes don't
+   spam the browser back-button with entries.
+*/
+function syncFiltersToURL() {
+  try {
+    const params = new URLSearchParams();
+    if (state.filter.country !== "all") params.set("country", state.filter.country);
+    if (state.filter.city !== "all")    params.set("city", state.filter.city);
+    if (state.filter.campaign !== "all") {
+      // Export the campaign NAME rather than its internal id ("c1", "c2", …)
+      // so the link stays meaningful if the id reassigns. Look up on read.
+      const c = getCampaignById(state.filter.campaign);
+      if (c) params.set("campaign", c.name);
+    }
+    // Preserve any unrelated params (e.g. ?debug=1)
+    const existing = new URLSearchParams(location.search);
+    for (const [k] of [["country"],["city"],["campaign"]]) existing.delete(k);
+    for (const [k, v] of params.entries()) existing.set(k, v);
+    const qs = existing.toString();
+    const newUrl = location.pathname + (qs ? "?" + qs : "") + location.hash;
+    history.replaceState(null, "", newUrl);
+  } catch (e) { /* non-fatal */ }
+}
+
+function applyFiltersFromURL() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const country = params.get("country");
+    const city = params.get("city");
+    const campaignName = params.get("campaign");
+
+    // Only apply values that actually exist in current data, otherwise a stale
+    // link won't break the page — it just lands on "All".
+    if (country) {
+      const exists = allLocations().some(L => L.country === country);
+      if (exists) state.filter.country = country;
+    }
+    if (city) {
+      // Must be valid within the currently-selected country
+      const exists = allLocations().some(L =>
+        (state.filter.country === "all" || L.country === state.filter.country) &&
+        (L.cities || []).includes(city)
+      );
+      if (exists) state.filter.city = city;
+    }
+    if (campaignName) {
+      const c = state.campaigns.find(c => c.name === campaignName);
+      if (c) state.filter.campaign = c.id;
+    }
+
+    // Sync the <select> elements so they reflect the applied state
+    const cSel = document.getElementById("filter-country");
+    const ciSel = document.getElementById("filter-city");
+    const cpSel = document.getElementById("filter-campaign");
+    if (cSel) cSel.value = state.filter.country;
+    if (ciSel) ciSel.value = state.filter.city;
+    if (cpSel) cpSel.value = state.filter.campaign;
+  } catch (e) { /* non-fatal */ }
+}
+
 function getFilteredLocations() {
   return allLocations().filter(L => {
+    if (state.filter.country !== "all" && L.country !== state.filter.country) return false;
     if (state.filter.city !== "all") {
       const cities = L.cities || (L.area ? [L.area] : []);
       if (!cities.includes(state.filter.city)) return false;
     }
-    if (state.filter.screen !== "all" && L.screen !== state.filter.screen) return false;
     return true;
   });
 }
@@ -2912,12 +2972,33 @@ function renderCampaignFilterDropdown() {
   else { sel.value = "all"; state.filter.campaign = "all"; }
 }
 
+function renderCountryFilterDropdown() {
+  const sel = document.getElementById("filter-country");
+  if (!sel) return;
+  const cur = sel.value || state.filter.country;
+  // Unique countries across all locations
+  const seen = new Set();
+  const countries = [];
+  for (const L of allLocations()) {
+    const c = L.country;
+    if (c && !seen.has(c)) { seen.add(c); countries.push(c); }
+  }
+  countries.sort((a,b) => a.localeCompare(b));
+  sel.innerHTML = '<option value="all">All countries</option>' +
+    countries.map(c => '<option value="' + escapeAttr(c) + '">' + escapeHtml(c) + '</option>').join("");
+  if (cur && cur !== "all" && countries.includes(cur)) sel.value = cur;
+  else { sel.value = "all"; state.filter.country = "all"; }
+}
+
 function renderCityFilterDropdown() {
   const sel = document.getElementById("filter-city");
-  const cur = sel.value;
-  // Unique cities across all locations (flattened)
+  if (!sel) return;
+  const cur = sel.value || state.filter.city;
+  // If a country is selected, only show cities that exist inside that country.
+  const country = state.filter.country;
   const seen = new Set(); const cities = [];
   for (const L of allLocations()) {
+    if (country !== "all" && L.country !== country) continue;
     const list = L.cities || (L.area ? [L.area] : []);
     for (const c of list) {
       if (!seen.has(c)) { seen.add(c); cities.push(c); }
@@ -2926,7 +3007,7 @@ function renderCityFilterDropdown() {
   cities.sort((a,b) => a.localeCompare(b));
   sel.innerHTML = '<option value="all">All cities</option>' +
     cities.map(c => '<option value="' + escapeAttr(c) + '">' + escapeHtml(c) + '</option>').join("");
-  if (cur !== "all" && cities.includes(cur)) sel.value = cur;
+  if (cur && cur !== "all" && cities.includes(cur)) sel.value = cur;
   else { sel.value = "all"; state.filter.city = "all"; }
 }
 
@@ -3684,6 +3765,7 @@ function rerenderAll() {
   renderGantt(); renderMobileList();
   renderCampaignTable();
   renderCampaignFilterDropdown();
+  renderCountryFilterDropdown();
   renderCityFilterDropdown();
 }
 function rerenderCampaignsAndGantt() {
@@ -3722,23 +3804,31 @@ function toast(msg) {
    EVENTS
    ============================================================ */
 function bindEvents() {
-  document.getElementById("filter-city").addEventListener("change", e => {
-    state.filter.city = e.target.value;
+  document.getElementById("filter-country").addEventListener("change", e => {
+    state.filter.country = e.target.value;
+    // Country change can invalidate the selected city — the city populator
+    // will reset it to "all" if so.
+    renderCityFilterDropdown();
+    syncFiltersToURL();
     renderKPIs(); renderGantt(); renderMobileList();
   });
-  document.getElementById("filter-screen").addEventListener("change", e => {
-    state.filter.screen = e.target.value;
+  document.getElementById("filter-city").addEventListener("change", e => {
+    state.filter.city = e.target.value;
+    syncFiltersToURL();
     renderKPIs(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-campaign").addEventListener("change", e => {
     state.filter.campaign = e.target.value;
+    syncFiltersToURL();
     renderGantt(); renderMobileList();
   });
   document.getElementById("filter-reset").addEventListener("click", () => {
-    state.filter = { city: "all", screen: "all", campaign: "all" };
+    state.filter = { country: "all", city: "all", campaign: "all" };
+    document.getElementById("filter-country").value = "all";
     document.getElementById("filter-city").value = "all";
-    document.getElementById("filter-screen").value = "all";
     document.getElementById("filter-campaign").value = "all";
+    renderCityFilterDropdown();  // repopulate cities for "all countries"
+    syncFiltersToURL();
     rerenderAll();
   });
   document.getElementById("add-campaign").addEventListener("click", () => {
@@ -3790,6 +3880,11 @@ function init() {
   renderDate();
   rerenderAll();
   bindEvents();
+  // Apply any ?country=...&city=...&campaign=... params from the URL. We do
+  // this AFTER the dropdowns have been populated so the <select> elements
+  // have the options to select. A second rerenderAll reflects the filter.
+  applyFiltersFromURL();
+  rerenderAll();
   setInterval(renderDate, 60 * 1000);
   // Connect to shared Firebase database — remote state will overlay local
   // cache as soon as it arrives. If Firebase is unreachable we stay in
