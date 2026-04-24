@@ -405,7 +405,48 @@
     #gantt-grid, .gantt-legend { display: none !important; }
     .mobile-loc-list { display: block; }
     #scroll-left, #scroll-right { display: none; }
+
+    /* Campaigns panel — stack the header into two rows and hide columns that
+       don't fit. Up/down order arrows aren't useful on touch anyway. */
+    .panel .camp-actions {
+      width: 100%;
+      margin-left: 0;
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+    }
+    .panel .camp-actions .search-wrap { flex: 1; min-width: 0; }
+    .panel .camp-actions .search { width: 100% !important; }
+    .panel .camp-actions #add-campaign {
+      flex-shrink: 0;
+      white-space: nowrap;
+      padding: 0 12px;
+    }
+    /* Swap "Add campaign" → "Add" on mobile */
+    .panel #add-campaign { font-size: 0; }
+    .panel #add-campaign svg { font-size: 13px; }
+    .panel #add-campaign::after {
+      content: "Add";
+      font-size: 13px;
+      font-weight: 500;
+    }
+    /* Campaign panel header becomes 2-row */
+    .panel:has(#camp-tbody) .panel-head {
+      flex-wrap: wrap;
+    }
+    .panel:has(#camp-tbody) #camp-count {
+      margin-left: auto;
+    }
+    /* Hide order + slot columns — swatch already encodes slot colour, and
+       the order arrows are awkward on touch. Users can reorder from desktop. */
+    .tbl-col-order, .tbl-col-slot { display: none; }
+    #camp-tbody td:nth-child(2), #camp-tbody td:nth-child(4) { display: none; }
+    /* Reclaim width for the Usage column and trim cell padding */
+    .tbl tbody td { padding: 10px 10px; font-size: 12.5px; }
+    .tbl thead th { padding: 10px 10px; }
+    .tbl-col-usage { width: auto; }
   }
+
   .ml-card {
     background: var(--surf);
     border: 1px solid var(--line);
