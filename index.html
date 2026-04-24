@@ -1470,6 +1470,49 @@ function getOrCreateSessionId() {
   return id;
 }
 
+/* Firebase Realtime Database has a well-known gotcha: arrays containing
+   nulls get silently converted to objects keyed by numeric index with the
+   null entries dropped. Example: [null, null, "c1", null, ...] is stored
+   and read back as {"2": "c1"}.
+   So we:
+     - Write schedule arrays as compact { "<week>": id } objects (no nulls)
+     - Read them back through this normalizer which rebuilds a full 40-slot
+       array regardless of how Firebase stored it.
+*/
+function normalizeScheduleArray(val) {
+  const out = Array(WEEK_COUNT).fill(null);
+  if (val == null) return out;
+  if (Array.isArray(val)) {
+    for (let i = 0; i < WEEK_COUNT; i++) {
+      out[i] = (val[i] !== undefined && val[i] !== null) ? val[i] : null;
+    }
+    return out;
+  }
+  if (typeof val === "object") {
+    for (const k of Object.keys(val)) {
+      const i = parseInt(k, 10);
+      if (!isNaN(i) && i >= 0 && i < WEEK_COUNT) out[i] = val[k];
+    }
+    return out;
+  }
+  return out;
+}
+
+function scheduleForFirebase(schedule) {
+  // Convert each 40-length array to a compact object keyed by week index,
+  // storing only non-null slots. Firebase preserves these cleanly.
+  const out = {};
+  for (const k of Object.keys(schedule)) {
+    const arr = schedule[k] || [];
+    const obj = {};
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i] != null) obj[String(i)] = arr[i];
+    }
+    out[k] = obj;
+  }
+  return out;
+}
+
 function scheduleFirebaseWrite() {
   clearTimeout(writeTimer);
   writeTimer = setTimeout(writePlanToFirebase, 400);
@@ -1481,7 +1524,7 @@ function writePlanToFirebase() {
   const payload = {
     campaigns: state.campaigns,
     userLocations: state.userLocations,
-    schedule: state.schedule,
+    schedule: scheduleForFirebase(state.schedule),
     _updatedAt: firebase.database.ServerValue.TIMESTAMP,
     _updatedBy: sessionId || "anon",
   };
@@ -1500,17 +1543,55 @@ function applyRemoteSnapshot(remote) {
   if (!remote || typeof remote !== "object") return;
   remoteApplyInProgress = true;
   try {
-    if (Array.isArray(remote.campaigns))     state.campaigns = remote.campaigns;
-    if (Array.isArray(remote.userLocations)) state.userLocations = remote.userLocations;
+    // Firebase may return arrays as objects keyed by numeric index if the
+    // array had holes. Coerce back to arrays.
+    const asArray = (v) => {
+      if (v == null) return [];
+      if (Array.isArray(v)) return v;
+      if (typeof v === "object") {
+        const keys = Object.keys(v).map(Number).filter(n => !isNaN(n));
+        if (keys.length === 0) return [];
+        const max = Math.max(...keys);
+        const out = Array(max + 1).fill(null);
+        for (const k of Object.keys(v)) {
+          const i = parseInt(k, 10);
+          if (!isNaN(i)) out[i] = v[k];
+        }
+        return out.filter(x => x != null);
+      }
+      return [];
+    };
+
+    state.campaigns     = asArray(remote.campaigns);
+    state.userLocations = asArray(remote.userLocations);
+
     if (remote.schedule && typeof remote.schedule === "object") {
+      // Start from empty schedule (all known locations), then overlay whatever
+      // the server has. Use normalizeScheduleArray to convert Firebase's
+      // possibly-sparse-object representation back to a proper 40-slot array.
       const base = emptySchedule();
       for (const k of Object.keys(remote.schedule)) {
-        if (k in base && Array.isArray(remote.schedule[k]) && remote.schedule[k].length === WEEK_COUNT) {
-          base[k] = remote.schedule[k];
+        if (k in base) {
+          base[k] = normalizeScheduleArray(remote.schedule[k]);
+        } else {
+          // Unknown location key — e.g. a user-added location that isn't in
+          // our local state yet. Keep it anyway so the Gantt can render it
+          // after state.userLocations arrives.
+          base[k] = normalizeScheduleArray(remote.schedule[k]);
         }
       }
       state.schedule = base;
     }
+
+    // After applying campaigns/locations/schedule, ensure every location has
+    // both main + overlay schedule keys.
+    for (const L of allLocations()) {
+      const km = cellKey(L.id, "main");
+      const ko = cellKey(L.id, "overlay");
+      if (!state.schedule[km]) state.schedule[km] = Array(WEEK_COUNT).fill(null);
+      if (!state.schedule[ko]) state.schedule[ko] = Array(WEEK_COUNT).fill(null);
+    }
+
     saveStateLocal();   // keep cache fresh
     rerenderAll();
   } finally {
