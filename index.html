@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Firebase Realtime Database (compat SDK for single-file use) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
 <style>
   /* =========================================
      DCT SM&C Dashboard Style System
@@ -130,6 +133,12 @@
     font-weight: 500;
   }
   .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 0 rgba(52,211,153,0.6); animation: pulse 1.8s ease-in-out infinite; }
+  /* Sync-pill status variants */
+  .live-pill[data-status="connecting"] .live-dot { background: var(--yellow); box-shadow: 0 0 0 0 rgba(252,211,77,0.6); }
+  .live-pill[data-status="online"]     .live-dot { background: var(--mint);   box-shadow: 0 0 0 0 rgba(52,211,153,0.6); }
+  .live-pill[data-status="offline"]    .live-dot { background: var(--text-3); animation: none; }
+  .live-pill[data-status="error"]      .live-dot { background: var(--rose);   animation: none; }
+  .live-pill[data-status="local"]      .live-dot { background: var(--accent-2); animation: none; }
   @keyframes pulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0.55); }
     50%      { box-shadow: 0 0 0 6px rgba(52,211,153,0); }
@@ -466,6 +475,162 @@
 
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 640px) { .field-row { grid-template-columns: 1fr; } }
+
+  /* City pills multi-select */
+  .city-input-wrap {
+    position: relative;
+    background: var(--bg-2);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    display: flex; flex-wrap: wrap; gap: 4px;
+    align-items: center;
+    min-height: 38px;
+  }
+  .city-input-wrap:focus-within { border-color: var(--accent); }
+  .city-pills { display: contents; }
+  .city-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(139,92,246,0.15);
+    color: var(--accent-2);
+    border: 1px solid rgba(139,92,246,0.35);
+    padding: 3px 4px 3px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .city-pill-x {
+    padding: 2px;
+    display: grid; place-items: center;
+    color: var(--accent-2);
+    opacity: 0.7;
+    border-radius: 3px;
+  }
+  .city-pill-x:hover { opacity: 1; background: rgba(139,92,246,0.3); }
+  .city-input {
+    flex: 1;
+    min-width: 100px;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    padding: 4px 2px;
+    font-size: 13px;
+    outline: none;
+  }
+  .city-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--surf-3);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-pop);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 10;
+  }
+  .city-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    text-align: left;
+    color: var(--text);
+    font-size: 13px;
+    transition: background 80ms ease;
+  }
+  .city-dropdown-item:hover { background: var(--surf-2); }
+  .city-dropdown-add { color: var(--accent-2); font-weight: 500; border-top: 1px solid var(--line); }
+
+  /* Image lightbox */
+  .lightbox-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 60;
+    display: grid; place-items: center;
+    padding: 20px;
+    opacity: 0;
+    animation: fadeIn 160ms ease forwards;
+    cursor: zoom-out;
+  }
+  .lightbox-img {
+    max-width: min(1200px, 96vw);
+    max-height: 90vh;
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+    object-fit: contain;
+    display: block;
+  }
+  .lightbox-meta {
+    position: absolute;
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20,26,37,0.9);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--line-2);
+    pointer-events: none;
+    max-width: 90%;
+    text-align: center;
+  }
+  .lightbox-meta-sub { font-family: var(--ff-mono); font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+  .lightbox-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(20,26,37,0.9);
+    color: var(--text);
+    display: grid; place-items: center;
+    border: 1px solid var(--line-2);
+    cursor: pointer;
+  }
+  .lightbox-close:hover { background: var(--rose); border-color: var(--rose); color: white; }
+  .g-loc-photo { cursor: zoom-in; transition: opacity 120ms ease; }
+  .g-loc-photo:hover { opacity: 0.85; }
+
+  /* Reorder arrows in campaigns table */
+  .order-controls {
+    display: inline-flex; flex-direction: column; gap: 1px;
+    margin-right: 6px;
+  }
+  .order-btn {
+    width: 14px; height: 14px;
+    display: grid; place-items: center;
+    color: var(--text-3);
+    border-radius: 2px;
+    transition: all 100ms ease;
+  }
+  .order-btn:hover:not(:disabled) { color: var(--accent); background: var(--surf-3); }
+  .order-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+  /* Import/Export buttons in header */
+  .header-tools { display: inline-flex; gap: 6px; align-items: center; }
+  .header-tool-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 5px 10px;
+    background: var(--surf);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-sm);
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 120ms ease;
+  }
+  .header-tool-btn:hover { background: var(--surf-2); color: var(--text); border-color: var(--accent); }
+
+  /* Merged cell month-boundary indicator (inset tick) */
+  .g-cell-month-tick {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 1px;
+    background: rgba(255,255,255,0.08);
+    pointer-events: none;
+  }
 
   .gantt-grid {
     display: grid;
@@ -877,7 +1042,21 @@
       <div class="top-sub">DCT Abu Dhabi SM&amp;C · Live Planning</div>
     </div>
     <div class="top-right">
-      <span class="live-pill"><span class="live-dot"></span><span id="live-status">Auto-saved</span></span>
+      <div class="header-tools">
+        <button class="header-tool-btn" id="btn-export" title="Download your plan as JSON">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v9M4 7l4 4 4-4M3 13h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Export</span>
+        </button>
+        <button class="header-tool-btn" id="btn-import" title="Load a plan from a JSON file">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 13V4M4 8l4-4 4 4M3 13h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Import</span>
+        </button>
+        <input type="file" id="import-file" accept=".json,application/json" style="display:none;">
+      </div>
+      <span class="live-pill" id="sync-pill" data-status="connecting">
+        <span class="live-dot" id="sync-dot"></span>
+        <span id="sync-text">Connecting…</span>
+      </span>
       <span class="top-date" id="top-date"></span>
     </div>
   </header>
@@ -899,7 +1078,6 @@
         <option value="all">All screens</option>
         <option value="Digital">Digital</option>
         <option value="Static">Static hoarding</option>
-        <option value="Indoor">Indoor digital</option>
       </select>
     </div>
     <div class="filter-group">
@@ -941,7 +1119,7 @@
     <div class="kpi" style="--top-border: var(--pink);">
       <div class="kpi-label">Campaigns in play</div>
       <div class="kpi-value" id="kpi-campaigns">0</div>
-      <div class="kpi-sub" id="kpi-campaigns-sub">of 20 slots</div>
+      <div class="kpi-sub" id="kpi-campaigns-sub">of 40 slots</div>
     </div>
   </section>
 
@@ -1023,6 +1201,7 @@
         <thead>
           <tr>
             <th class="tbl-col-color"></th>
+            <th class="tbl-col-order" style="width: 80px; text-align: center;">Order</th>
             <th>Name</th>
             <th class="tbl-col-slot">Slot</th>
             <th class="tbl-col-usage">Usage</th>
@@ -1048,26 +1227,35 @@
    DATA
    ============================================================ */
 const SLOT_COLORS = [
+  // 0-9 — primary set
   "#A78BFA","#F472B6","#34D399","#FBBF24","#60A5FA",
   "#F87171","#2DD4BF","#C084FC","#FB923C","#A3E635",
+  // 10-19 — extended
   "#E879F9","#38BDF8","#FB7185","#4ADE80","#FACC15",
   "#818CF8","#F59E0B","#14B8A6","#D946EF","#A8A29E",
+  // 20-29 — deeper hues (still white-text safe)
+  "#7C3AED","#DB2777","#059669","#D97706","#2563EB",
+  "#DC2626","#0891B2","#9333EA","#EA580C","#65A30D",
+  // 30-39 — mixed tones
+  "#C026D3","#0284C7","#E11D48","#16A34A","#CA8A04",
+  "#4F46E5","#B45309","#0D9488","#A21CAF","#78716C",
 ];
+const MAX_CAMPAIGNS = SLOT_COLORS.length;  // 40
 
 const BASE_LOCATIONS = [
-  { id:"citywalk",   name:"Citywalk",             area:"Dubai",     screen:"Digital", faces:49,  photo:"01_dubai_citywalk",       notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
-  { id:"jbr",        name:"JBR",                  area:"Dubai",     screen:"Digital", faces:46,  photo:"02_dubai_jbr",            notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
-  { id:"marina",     name:"Marina Hoarding",      area:"Dubai",     screen:"Static",  faces:1,   photo:"03_dubai_marina_hoarding",notes:"Static · one creative per period" },
-  { id:"downtown",   name:"Downtown Luxe Screen", area:"Dubai",     screen:"Digital", faces:1,   photo:"04_dubai_downtown_luxe",  notes:"Premium placement" },
-  { id:"bluewaters", name:"Bluewaters",           area:"Dubai",     screen:"Digital", faces:13,  photo:"09_dubai_bluewaters",     notes:"2 mo FOC · peak summer" },
-  { id:"giga",       name:"Giga Screen",          area:"Dubai",     screen:"Digital", faces:1,   photo:"10_dubai_giga_screen",    notes:"FOC: 2 mo 2026 (+2 mo 2027)" },
-  { id:"ummsuqeim",  name:"Umm Suqeim Unipoles",  area:"Dubai",     screen:"Digital", faces:2,   photo:"11_dubai_umm_suqeim",     notes:"2 mo FOC · peak summer" },
-  { id:"triplecrown",name:"Triple Crown",         area:"Abu Dhabi", screen:"Digital", faces:6,   photo:"05_ad_triple_crown",      notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
-  { id:"nationtwrs", name:"Nation Towers Screen", area:"Abu Dhabi", screen:"Digital", faces:1,   photo:"06_ad_nation_towers",     notes:"Premium placement" },
-  { id:"touristclub",name:"Tourist Club, Mariah Main", area:"Abu Dhabi", screen:"Static", faces:1, photo:"07_ad_tourist_club",    notes:"FOC: 2 production costs" },
-  { id:"galleria",   name:"Galleria Mall",        area:"Abu Dhabi", screen:"Digital", faces:272, photo:"08_ad_galleria_mall",     notes:"16 mo total (+4 outdoor / 20 indoor)" },
-  { id:"hotels",     name:"Hotel Network",        area:"AD + DXB",  screen:"Indoor",  faces:270, photo:"12_hotel_network",        notes:"106 hotels · 5 mo paid + 3 mo FOC" },
-  { id:"malls",      name:"AD & Dubai Malls",     area:"AD + DXB",  screen:"Indoor",  faces:977, photo:"13_ad_dubai_malls",       notes:"28 malls · +1 bonus spot network-wide" },
+  { id:"citywalk",   name:"Citywalk",             country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:49,  photo:"01_dubai_citywalk",       notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
+  { id:"jbr",        name:"JBR",                  country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:46,  photo:"02_dubai_jbr",            notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
+  { id:"marina",     name:"Marina Hoarding",      country:"United Arab Emirates", cities:["Dubai"],             screen:"Static",  faces:1,   photo:"03_dubai_marina_hoarding",notes:"Static · one creative per period" },
+  { id:"downtown",   name:"Downtown Luxe Screen", country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:1,   photo:"04_dubai_downtown_luxe",  notes:"Premium placement" },
+  { id:"bluewaters", name:"Bluewaters",           country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:13,  photo:"09_dubai_bluewaters",     notes:"2 mo FOC · peak summer" },
+  { id:"giga",       name:"Giga Screen",          country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:1,   photo:"10_dubai_giga_screen",    notes:"FOC: 2 mo 2026 (+2 mo 2027)" },
+  { id:"ummsuqeim",  name:"Umm Suqeim Unipoles",  country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:2,   photo:"11_dubai_umm_suqeim",     notes:"2 mo FOC · peak summer" },
+  { id:"triplecrown",name:"Triple Crown",         country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:6,   photo:"05_ad_triple_crown",      notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
+  { id:"nationtwrs", name:"Nation Towers Screen", country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:1,   photo:"06_ad_nation_towers",     notes:"Premium placement" },
+  { id:"touristclub",name:"Tourist Club, Mariah Main", country:"United Arab Emirates", cities:["Abu Dhabi"],    screen:"Static",  faces:1,   photo:"07_ad_tourist_club",      notes:"FOC: 2 production costs" },
+  { id:"galleria",   name:"Galleria Mall",        country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:272, photo:"08_ad_galleria_mall",     notes:"16 mo total (+4 outdoor / 20 indoor)" },
+  { id:"hotels",     name:"Hotel Network",        country:"United Arab Emirates", cities:["Abu Dhabi","Dubai"], screen:"Digital",  faces:270, photo:"12_hotel_network",        notes:"106 hotels · indoor digital · 5 mo paid + 3 mo FOC" },
+  { id:"malls",      name:"AD & Dubai Malls",     country:"United Arab Emirates", cities:["Abu Dhabi","Dubai"], screen:"Digital",  faces:977, photo:"13_ad_dubai_malls",       notes:"28 malls · indoor digital · +1 bonus spot network-wide" },
 ];
 
 const DEFAULT_CAMPAIGNS = [
@@ -1140,7 +1328,16 @@ function loadState() {
     if (!raw) return false;
     const obj = JSON.parse(raw);
     if (Array.isArray(obj.campaigns)) state.campaigns = obj.campaigns;
-    if (Array.isArray(obj.userLocations)) state.userLocations = obj.userLocations;
+    if (Array.isArray(obj.userLocations)) {
+      // Legacy migration: area → country/cities
+      state.userLocations = obj.userLocations.map(L => {
+        if (L.cities && L.country) return L;
+        const cities = L.cities ? L.cities : (L.area ? (L.area === "AD + DXB" ? ["Abu Dhabi","Dubai"] : [L.area]) : []);
+        const country = L.country || "United Arab Emirates";
+        const { area, ...rest } = L;
+        return { ...rest, country, cities };
+      });
+    }
     if (obj.schedule && typeof obj.schedule === "object") {
       const base = emptySchedule();
       for (const k of Object.keys(obj.schedule)) {
@@ -1154,14 +1351,13 @@ function loadState() {
   } catch (e) { return false; }
 }
 
-function saveState() {
+function saveStateLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       campaigns: state.campaigns,
       userLocations: state.userLocations,
       schedule: state.schedule,
     }));
-    flashSaved();
   } catch (e) {
     if (e && (e.name === "QuotaExceededError" || (""+e).match(/quota/i))) {
       toast("Storage full — try fewer or smaller photos");
@@ -1169,12 +1365,228 @@ function saveState() {
   }
 }
 
-let saveTimer = null;
+function saveState() {
+  // Always write to localStorage (offline cache / fallback).
+  saveStateLocal();
+  flashSaved();
+  // Optimistically push to Firebase if available. If this turn is applying a
+  // remote snapshot, skip to avoid an echo loop.
+  if (fbReady && !remoteApplyInProgress) {
+    scheduleFirebaseWrite();
+  }
+}
+
+/* ============================================================
+   SYNC STATUS + FIREBASE REALTIME DATABASE
+   ============================================================
+   Master data lives in Firebase Realtime DB. localStorage is kept in sync as
+   an offline cache so the dashboard still works with no network.
+
+   Conflict model: last-write-wins. Full /plan object is written on any change
+   (debounced 400ms). Remote changes are applied immediately but skip the
+   save loop via the remoteApplyInProgress flag. Our own writes are echoed
+   back by Firebase and ignored via the myLastWriteAt timestamp.
+*/
+
+const FB_CONFIG = {
+  databaseURL: "https://ooh-bcf22-default-rtdb.firebaseio.com/",
+  projectId:   "ooh-bcf22",
+};
+
+let fbDb = null;
+let fbReady = false;
+let remoteApplyInProgress = false;
+let myLastWriteAt = 0;
+let writeTimer = null;
+let presenceRef = null;
+let sessionId = null;
+let justSavedLocal = 0;   // timestamp for UI flash
+
+function setSyncStatus(status, text) {
+  const pill = document.getElementById("sync-pill");
+  const txt  = document.getElementById("sync-text");
+  if (!pill || !txt) return;
+  pill.dataset.status = status;
+  txt.textContent = text;
+}
+
 function flashSaved() {
-  const el = document.getElementById("live-status");
-  el.textContent = "Saved";
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => { el.textContent = "Auto-saved"; }, 1400);
+  // Briefly shows "Saved" when local state has persisted. If Firebase is
+  // running, the sync status will take over again once the remote write
+  // resolves.
+  justSavedLocal = Date.now();
+  const pill = document.getElementById("sync-pill");
+  const txt  = document.getElementById("sync-text");
+  if (!pill || !txt) return;
+  const priorStatus = pill.dataset.status;
+  const priorText = txt.textContent;
+  txt.textContent = "Saved";
+  clearTimeout(flashSaved._t);
+  flashSaved._t = setTimeout(() => {
+    // Only reset if another flash/sync hasn't taken over
+    if (txt.textContent === "Saved") {
+      // Fall back to whatever the sync state currently says
+      refreshSyncBadge();
+    }
+  }, 1200);
+}
+
+function refreshSyncBadge() {
+  const pill = document.getElementById("sync-pill");
+  if (!pill) return;
+  const s = pill.dataset.status;
+  const txt = document.getElementById("sync-text");
+  if (!fbReady) {
+    setSyncStatus("local", "Offline — saved locally");
+    return;
+  }
+  // Preserve online-count label if present
+  if (s === "online") {
+    txt.textContent = lastOnlineLabel || "Synced";
+  } else if (s === "connecting") {
+    txt.textContent = "Connecting…";
+  }
+}
+
+let lastOnlineLabel = "Synced";
+function updateOnlineCount(n) {
+  const me = 1;
+  const others = Math.max(0, n - me);
+  lastOnlineLabel = others === 0 ? "Only you · Synced" :
+                    others === 1 ? "1 other · Synced" :
+                                   others + " others · Synced";
+  const pill = document.getElementById("sync-pill");
+  if (pill && pill.dataset.status === "online") {
+    document.getElementById("sync-text").textContent = lastOnlineLabel;
+  }
+}
+
+function getOrCreateSessionId() {
+  let id = localStorage.getItem("ooh_session_id");
+  if (!id) {
+    id = "s_" + Math.random().toString(36).slice(2, 10) + "_" + Date.now().toString(36);
+    localStorage.setItem("ooh_session_id", id);
+  }
+  return id;
+}
+
+function scheduleFirebaseWrite() {
+  clearTimeout(writeTimer);
+  writeTimer = setTimeout(writePlanToFirebase, 400);
+}
+
+function writePlanToFirebase() {
+  if (!fbReady) return;
+  myLastWriteAt = Date.now();
+  const payload = {
+    campaigns: state.campaigns,
+    userLocations: state.userLocations,
+    schedule: state.schedule,
+    _updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    _updatedBy: sessionId || "anon",
+  };
+  fbDb.ref("plan").set(payload)
+    .then(() => {
+      // "Synced" state kept; only pill dot/text represents state
+      refreshSyncBadge();
+    })
+    .catch((err) => {
+      console.warn("Firebase write failed", err);
+      setSyncStatus("error", "Sync failed — kept local");
+    });
+}
+
+function applyRemoteSnapshot(remote) {
+  if (!remote || typeof remote !== "object") return;
+  remoteApplyInProgress = true;
+  try {
+    if (Array.isArray(remote.campaigns))     state.campaigns = remote.campaigns;
+    if (Array.isArray(remote.userLocations)) state.userLocations = remote.userLocations;
+    if (remote.schedule && typeof remote.schedule === "object") {
+      const base = emptySchedule();
+      for (const k of Object.keys(remote.schedule)) {
+        if (k in base && Array.isArray(remote.schedule[k]) && remote.schedule[k].length === WEEK_COUNT) {
+          base[k] = remote.schedule[k];
+        }
+      }
+      state.schedule = base;
+    }
+    saveStateLocal();   // keep cache fresh
+    rerenderAll();
+  } finally {
+    remoteApplyInProgress = false;
+  }
+}
+
+function initFirebase() {
+  if (typeof firebase === "undefined") {
+    setSyncStatus("local", "Offline — saved locally");
+    return;
+  }
+  try {
+    firebase.initializeApp(FB_CONFIG);
+    fbDb = firebase.database();
+    fbReady = true;
+    sessionId = getOrCreateSessionId();
+    setSyncStatus("connecting", "Connecting…");
+
+    // ---- PLAN SUBSCRIPTION ----
+    fbDb.ref("plan").on("value", (snap) => {
+      const remote = snap.val();
+
+      // Empty database — seed with our current state.
+      if (!remote) {
+        writePlanToFirebase();
+        return;
+      }
+
+      // Ignore our own echo (Firebase echoes writes back to us).
+      const remoteStamp = remote._updatedBy;
+      if (remoteStamp === sessionId && Date.now() - myLastWriteAt < 2500) return;
+
+      applyRemoteSnapshot(remote);
+
+      // Show a subtle toast if this was an external edit
+      if (remoteStamp && remoteStamp !== sessionId && Date.now() - myLastWriteAt > 1000) {
+        toast("Plan updated · changes from another user");
+      }
+    }, (err) => {
+      console.warn("Firebase subscription error", err);
+      setSyncStatus("error", "Sync failed — kept local");
+    });
+
+    // ---- PRESENCE ----
+    presenceRef = fbDb.ref("presence/" + sessionId);
+    const connRef = fbDb.ref(".info/connected");
+    connRef.on("value", (snap) => {
+      if (snap.val() === true) {
+        presenceRef.onDisconnect().remove();
+        presenceRef.set({
+          joinedAt: firebase.database.ServerValue.TIMESTAMP,
+        });
+        setSyncStatus("online", lastOnlineLabel);
+      } else {
+        setSyncStatus("local", "Offline — saved locally");
+      }
+    });
+
+    fbDb.ref("presence").on("value", (snap) => {
+      const data = snap.val() || {};
+      // Filter out stale entries (>10 minutes since joinedAt, shouldn't happen
+      // with onDisconnect but belt-and-braces)
+      const now = Date.now();
+      let count = 0;
+      for (const k of Object.keys(data)) {
+        const t = data[k] && data[k].joinedAt;
+        if (!t || (now - t) < 10 * 60 * 1000) count++;
+      }
+      updateOnlineCount(count);
+    });
+  } catch (err) {
+    console.warn("Firebase init failed", err);
+    fbReady = false;
+    setSyncStatus("local", "Offline — saved locally");
+  }
 }
 
 /* ============================================================
@@ -1212,7 +1624,10 @@ function getCampaignUsage() {
 }
 function getFilteredLocations() {
   return allLocations().filter(L => {
-    if (state.filter.city !== "all" && L.area !== state.filter.city) return false;
+    if (state.filter.city !== "all") {
+      const cities = L.cities || (L.area ? [L.area] : []);
+      if (!cities.includes(state.filter.city)) return false;
+    }
     if (state.filter.screen !== "all" && L.screen !== state.filter.screen) return false;
     return true;
   });
@@ -1376,12 +1791,15 @@ function renderGantt() {
     row.className = "g-loc";
     const screenClass = L.screen.toLowerCase();
     const userTag = L.user ? '<span class="g-loc-user-tag" style="margin-left: 4px;" title="Custom location">Custom</span>' : '';
+    const cities = L.cities || (L.area ? [L.area] : []);
+    const cityChips = cities.slice(0, 2).map(c => '<span class="g-loc-chip">' + escapeHtml(c) + '</span>').join("");
+    const extraChip = cities.length > 2 ? '<span class="g-loc-chip" title="' + escapeAttr(cities.slice(2).join(", ")) + '">+' + (cities.length - 2) + '</span>' : '';
     row.innerHTML =
-      '<img class="g-loc-photo" src="' + escapeAttr(photoSrc(L)) + '" alt="" loading="lazy">' +
+      '<img class="g-loc-photo" src="' + escapeAttr(photoSrc(L)) + '" alt="" loading="lazy" data-loc-id="' + escapeAttr(L.id) + '">' +
       '<div class="g-loc-meta">' +
         '<div class="g-loc-name">' + escapeHtml(L.name) + '</div>' +
         '<div class="g-loc-chips">' +
-          '<span class="g-loc-chip">' + escapeHtml(L.area) + '</span>' +
+          cityChips + extraChip +
           '<span class="g-loc-chip ' + screenClass + '">' + escapeHtml(L.screen) + '</span>' +
           userTag +
         '</div>' +
@@ -1394,6 +1812,12 @@ function renderGantt() {
         openLocationEditor(L);
       });
     }
+    // Photo click → lightbox
+    const photoEl = row.querySelector(".g-loc-photo");
+    photoEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openLightbox(L);
+    });
     colLoc.appendChild(row);
   }
   grid.appendChild(colLoc);
@@ -1482,51 +1906,99 @@ function makeRowCells(location, track, plan, weekW) {
   const isStatic = location.screen === "Static" && track === "overlay";
   const campFilter = state.filter.campaign;
 
-  for (let i = 0; i < WEEK_COUNT; i++) {
-    const cell = document.createElement("button");
-    cell.className = "g-cell" + (i % 4 === 0 ? " month-start" : "");
-    cell.style.width = weekW + "px";
-    cell.style.flex = "0 0 " + weekW + "px";
-    if (isStatic) {
-      cell.classList.add("static-disabled");
-      cell.disabled = true;
-    } else {
-      const campId = plan[i];
-      if (campId) {
-        const camp = getCampaignById(campId);
-        if (camp) {
-          const color = SLOT_COLORS[camp.slot] || "#666";
-          // Dim when a campaign filter is set and this one doesn't match
-          const dimmed = campFilter !== "all" && campFilter !== campId;
-          cell.style.background = color;
-          if (dimmed) cell.style.opacity = "0.18";
-          const label = document.createElement("span");
-          label.className = "g-cell-label";
-          label.textContent = camp.name;
-          cell.appendChild(label);
+  // Static overlay row — render one big disabled cell
+  if (isStatic) {
+    const cell = document.createElement("div");
+    cell.className = "g-cell static-disabled";
+    cell.style.width = (WEEK_COUNT * weekW) + "px";
+    cell.style.flex = "0 0 " + (WEEK_COUNT * weekW) + "px";
+    cell.style.borderLeft = "1px solid var(--line-2)";
+    cell.title = "Not available on static hoardings";
+    frag.appendChild(cell);
+    return frag;
+  }
+
+  // Merge adjacent non-null same-campaign runs; keep nulls as individual cells
+  let i = 0;
+  while (i < WEEK_COUNT) {
+    const id = plan[i];
+    if (id) {
+      // Find end of run
+      let j = i;
+      while (j < WEEK_COUNT && plan[j] === id) j++;
+      const runLen = j - i;
+      const camp = getCampaignById(id);
+
+      const cell = document.createElement("button");
+      cell.className = "g-cell" + (i % 4 === 0 ? " month-start" : "");
+      cell.style.width = (runLen * weekW) + "px";
+      cell.style.flex = "0 0 " + (runLen * weekW) + "px";
+      if (camp) {
+        const color = SLOT_COLORS[camp.slot] || "#666";
+        const dimmed = campFilter !== "all" && campFilter !== id;
+        cell.style.background = color;
+        if (dimmed) cell.style.opacity = "0.18";
+        const label = document.createElement("span");
+        label.className = "g-cell-label";
+        label.textContent = camp.name;
+        cell.appendChild(label);
+
+        // Month-boundary ticks inside the merged cell (subtle)
+        for (let k = 1; k < runLen; k++) {
+          const absWeek = i + k;
+          if (absWeek % 4 === 0) {
+            const tick = document.createElement("span");
+            tick.className = "g-cell-month-tick";
+            tick.style.left = (k * weekW - 1) + "px";
+            cell.appendChild(tick);
+          }
         }
-      } else {
-        const plus = document.createElement("span");
-        plus.className = "g-cell-empty-plus";
-        plus.textContent = "+";
-        cell.appendChild(plus);
       }
       cell.dataset.loc = location.id;
       cell.dataset.track = track;
-      cell.dataset.week = i;
+      cell.dataset.weekStart = i;
+      cell.dataset.weekLen = runLen;
       cell.addEventListener("click", onCellClick);
+      frag.appendChild(cell);
+      i = j;
+    } else {
+      // Individual empty cell
+      const cell = document.createElement("button");
+      cell.className = "g-cell" + (i % 4 === 0 ? " month-start" : "");
+      cell.style.width = weekW + "px";
+      cell.style.flex = "0 0 " + weekW + "px";
+      const plus = document.createElement("span");
+      plus.className = "g-cell-empty-plus";
+      plus.textContent = "+";
+      cell.appendChild(plus);
+      cell.dataset.loc = location.id;
+      cell.dataset.track = track;
+      cell.dataset.weekStart = i;
+      cell.dataset.weekLen = 1;
+      cell.addEventListener("click", onCellClick);
+      frag.appendChild(cell);
+      i++;
     }
-    frag.appendChild(cell);
   }
 
   return frag;
 }
 
 function onCellClick(e) {
-  const locId = e.currentTarget.dataset.loc;
-  const track = e.currentTarget.dataset.track;
-  const week = parseInt(e.currentTarget.dataset.week, 10);
-  openCampaignPicker(locId, track, week);
+  const btn = e.currentTarget;
+  const locId = btn.dataset.loc;
+  const track = btn.dataset.track;
+  const weekStart = parseInt(btn.dataset.weekStart, 10);
+  const weekLen = parseInt(btn.dataset.weekLen, 10);
+  // If this is a merged cell (runLen > 1), figure out which specific week the user clicked on
+  let clickedWeek = weekStart;
+  if (weekLen > 1) {
+    const rect = btn.getBoundingClientRect();
+    const offsetX = Math.max(0, e.clientX - rect.left);
+    const sub = Math.min(weekLen - 1, Math.floor(offsetX / (rect.width / weekLen)));
+    clickedWeek = weekStart + sub;
+  }
+  openCampaignPicker(locId, track, clickedWeek);
 }
 
 /* ============================================================
@@ -1537,33 +2009,83 @@ function renderCampaignTable() {
   const countEl = document.getElementById("camp-count");
   const q = state.campSearch.toLowerCase();
   const usage = getCampaignUsage();
-  const filtered = state.campaigns.filter(c => !q || c.name.toLowerCase().includes(q));
+  // Respect array order (= display order)
+  const filtered = state.campaigns
+    .map((c, idx) => ({ ...c, _idx: idx }))
+    .filter(c => !q || c.name.toLowerCase().includes(q));
 
-  countEl.textContent = filtered.length + " / " + state.campaigns.length + " shown · max 20";
+  countEl.textContent = filtered.length + " / " + state.campaigns.length + " shown · max " + MAX_CAMPAIGNS;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="padding: 30px; text-align: center; color: var(--text-3);">' + (q ? "No campaigns match \"" + escapeHtml(q) + "\"" : "No campaigns yet. Click Add campaign to create one.") + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="padding: 30px; text-align: center; color: var(--text-3);">' + (q ? "No campaigns match \"" + escapeHtml(q) + "\"" : "No campaigns yet. Click Add campaign to create one.") + '</td></tr>';
     return;
   }
 
   tbody.innerHTML = "";
   const maxUsage = Math.max(...filtered.map(c => usage[c.id] || 0), 1);
+  const total = state.campaigns.length;
 
   for (const c of filtered) {
     const u = usage[c.id] || 0;
     const pct = (u / maxUsage) * 100;
     const color = SLOT_COLORS[c.slot] || "#666";
+    const idx = c._idx;
+    const canUp = idx > 0;
+    const canDown = idx < total - 1;
+
     const tr = document.createElement("tr");
     tr.dataset.id = c.id;
     tr.innerHTML =
       '<td class="tbl-col-color"><div class="color-block" style="background: ' + color + ';"></div></td>' +
+      '<td class="tbl-col-order" style="text-align:center;">' +
+        '<span style="display:inline-flex; align-items:center; gap: 2px;">' +
+          '<span class="order-controls">' +
+            '<button class="order-btn" data-up="' + c.id + '" ' + (canUp ? '' : 'disabled') + ' aria-label="Move up"><svg width="8" height="8" viewBox="0 0 10 10"><path d="M2 6l3-3 3 3" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+            '<button class="order-btn" data-down="' + c.id + '" ' + (canDown ? '' : 'disabled') + ' aria-label="Move down"><svg width="8" height="8" viewBox="0 0 10 10"><path d="M2 4l3 3 3-3" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+          '</span>' +
+          '<span style="font-family: var(--ff-mono); font-size: 11px; color: var(--text-3); min-width: 18px; text-align: right;">' + (idx + 1) + '</span>' +
+        '</span>' +
+      '</td>' +
       '<td><div style="font-weight: 500; color: var(--text);">' + escapeHtml(c.name) + '</div></td>' +
       '<td class="tbl-col-slot"><span style="font-family: var(--ff-mono); font-size: 11px; color: var(--text-3);">' + (c.slot+1) + '</span></td>' +
       '<td class="tbl-col-usage"><div class="usage-bar-wrap"><div class="usage-bar"><div class="usage-bar-fill" style="width:' + pct + '%; background:' + color + ';"></div></div><span class="usage-num">' + u + ' wk</span></div></td>' +
       '<td class="tbl-col-actions"><button class="row-menu-btn" aria-label="Edit"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-7 7H4.5v-2l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button></td>';
-    tr.addEventListener("click", () => openCampaignEditor(c));
+
+    // Wire arrow buttons (stopPropagation so row-click-to-edit doesn't fire)
+    const upBtn = tr.querySelector("[data-up]");
+    const downBtn = tr.querySelector("[data-down]");
+    if (upBtn && !upBtn.disabled) {
+      upBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        moveCampaign(c.id, -1);
+      });
+    }
+    if (downBtn && !downBtn.disabled) {
+      downBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        moveCampaign(c.id, +1);
+      });
+    }
+    // Row click to edit — but only outside the order-controls column
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest(".order-controls")) return;
+      openCampaignEditor(c);
+    });
     tbody.appendChild(tr);
   }
+}
+
+function moveCampaign(id, direction) {
+  const idx = state.campaigns.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= state.campaigns.length) return;
+  const arr = state.campaigns.slice();
+  const [item] = arr.splice(idx, 1);
+  arr.splice(newIdx, 0, item);
+  state.campaigns = arr;
+  saveState();
+  rerenderCampaignsAndGantt();
 }
 
 function renderCampaignFilterDropdown() {
@@ -1584,14 +2106,18 @@ function renderCampaignFilterDropdown() {
 function renderCityFilterDropdown() {
   const sel = document.getElementById("filter-city");
   const cur = sel.value;
-  // Unique areas across all locations, preserving order of first appearance
-  const seen = new Set(); const areas = [];
+  // Unique cities across all locations (flattened)
+  const seen = new Set(); const cities = [];
   for (const L of allLocations()) {
-    if (!seen.has(L.area)) { seen.add(L.area); areas.push(L.area); }
+    const list = L.cities || (L.area ? [L.area] : []);
+    for (const c of list) {
+      if (!seen.has(c)) { seen.add(c); cities.push(c); }
+    }
   }
+  cities.sort((a,b) => a.localeCompare(b));
   sel.innerHTML = '<option value="all">All cities</option>' +
-    areas.map(a => '<option value="' + escapeAttr(a) + '">' + escapeHtml(a) + '</option>').join("");
-  if (cur !== "all" && areas.includes(cur)) sel.value = cur;
+    cities.map(c => '<option value="' + escapeAttr(c) + '">' + escapeHtml(c) + '</option>').join("");
+  if (cur !== "all" && cities.includes(cur)) sel.value = cur;
   else { sel.value = "all"; state.filter.city = "all"; }
 }
 
@@ -1684,7 +2210,7 @@ function openCampaignEditor(existing) {
     const used = new Set(state.campaigns.map(c => c.slot));
     slot = 0;
     while (slot < SLOT_COLORS.length && used.has(slot)) slot++;
-    if (slot >= SLOT_COLORS.length) { toast("All 20 colour slots are in use"); return; }
+    if (slot >= SLOT_COLORS.length) { toast("All " + MAX_CAMPAIGNS + " colour slots are in use"); return; }
   } else {
     slot = existing.slot;
   }
@@ -1692,6 +2218,9 @@ function openCampaignEditor(existing) {
   const campId = isNew ? ("c_" + Math.random().toString(36).slice(2, 9)) : existing.id;
   let name = isNew ? "" : existing.name;
   let chosenSlot = slot;
+  // Display order is 1-indexed. New campaigns default to "end of list".
+  const currentIdx = isNew ? state.campaigns.length : state.campaigns.findIndex(c => c.id === existing.id);
+  let chosenOrder = currentIdx + 1;   // 1-indexed for the user
 
   const wrap = document.createElement("div");
   wrap.className = "modal-backdrop";
@@ -1709,6 +2238,8 @@ function openCampaignEditor(existing) {
              (isActive ? '<span class="swatch-check"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : '') +
              '</button>';
     }).join("");
+
+    const maxOrder = isNew ? state.campaigns.length + 1 : state.campaigns.length;
 
     wrap.innerHTML =
       '<div class="modal">' +
@@ -1728,6 +2259,11 @@ function openCampaignEditor(existing) {
             '<label class="field-label">Colour slot</label>' +
             '<div class="swatch-grid">' + swHtml + '</div>' +
             '<p style="font-size: 10px; color: var(--text-3); margin: 8px 0 0; font-family: var(--ff-mono);">Dim slots already used by other campaigns.</p>' +
+          '</div>' +
+          '<div class="field">' +
+            '<label class="field-label" for="ed-order">Display order <span style="color: var(--text-3); font-weight: 400; letter-spacing: 0;">· 1 = top of list</span></label>' +
+            '<input type="number" min="1" max="' + maxOrder + '" step="1" class="field-input" id="ed-order" style="max-width: 160px;" value="' + chosenOrder + '">' +
+            '<p style="font-size: 10px; color: var(--text-3); margin: 6px 0 0; font-family: var(--ff-mono);">Position in the campaigns list (1–' + maxOrder + ')</p>' +
           '</div>' +
         '</div>' +
         '<div class="modal-foot">' +
@@ -1751,6 +2287,10 @@ function openCampaignEditor(existing) {
         render();
       });
     });
+    wrap.querySelector("#ed-order").addEventListener("input", (e) => {
+      const v = parseInt(e.target.value, 10);
+      if (!isNaN(v)) chosenOrder = v;
+    });
     wrap.querySelector("#ed-save").addEventListener("click", doSave);
     const delBtn = wrap.querySelector("#ed-del");
     if (delBtn) delBtn.addEventListener("click", () => {
@@ -1770,10 +2310,21 @@ function openCampaignEditor(existing) {
   function doSave() {
     const n = (name || "").trim();
     if (!n) { toast("Name required"); return; }
+    // Clamp order to valid range
+    const arrLen = isNew ? state.campaigns.length + 1 : state.campaigns.length;
+    const targetIdx = Math.max(0, Math.min(arrLen - 1, (chosenOrder | 0) - 1));
     if (isNew) {
-      state.campaigns = [...state.campaigns, { id: campId, name: n, slot: chosenSlot }];
+      const newCamp = { id: campId, name: n, slot: chosenSlot };
+      const arr = state.campaigns.slice();
+      arr.splice(targetIdx, 0, newCamp);
+      state.campaigns = arr;
     } else {
-      state.campaigns = state.campaigns.map(c => c.id === existing.id ? { ...c, name: n, slot: chosenSlot } : c);
+      // Update fields first
+      const updated = { ...existing, name: n, slot: chosenSlot };
+      // Remove from old position, insert at new
+      let arr = state.campaigns.filter(c => c.id !== existing.id);
+      arr.splice(targetIdx, 0, updated);
+      state.campaigns = arr;
     }
     saveState();
     closeModal();
@@ -1786,8 +2337,89 @@ function openCampaignEditor(existing) {
 }
 
 /* ============================================================
-   LOCATION EDITOR
+   IMAGE LIGHTBOX
    ============================================================ */
+function openLightbox(L) {
+  const wrap = document.createElement("div");
+  wrap.className = "lightbox-backdrop";
+  const cities = (L.cities && L.cities.length) ? L.cities.join(" · ") : (L.area || "—");
+  wrap.innerHTML =
+    '<button class="lightbox-close" aria-label="Close"><svg width="18" height="18" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>' +
+    '<img class="lightbox-img" src="' + escapeAttr(photoSrc(L)) + '" alt="">' +
+    '<div class="lightbox-meta">' +
+      escapeHtml(L.name) +
+      '<div class="lightbox-meta-sub">' + escapeHtml(cities) + ' · ' + escapeHtml(L.screen) + ' · ' + L.faces.toLocaleString() + ' face' + (L.faces===1?'':'s') + '</div>' +
+    '</div>';
+  wrap.addEventListener("click", closeModal);
+  document.getElementById("modal-root").appendChild(wrap);
+}
+
+/* ============================================================
+   JSON EXPORT / IMPORT (backup & device transfer)
+   ============================================================ */
+function exportStateAsJSON() {
+  const payload = {
+    _format: "ooh_dashboard_export_v1",
+    _exported_at: new Date().toISOString(),
+    campaigns: state.campaigns,
+    userLocations: state.userLocations,
+    schedule: state.schedule,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const today = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = "ooh_plan_" + today + ".json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast("Plan exported");
+}
+
+function importStateFromFile(file) {
+  const reader = new FileReader();
+  reader.onerror = () => toast("Couldn't read file");
+  reader.onload = () => {
+    try {
+      const obj = JSON.parse(reader.result);
+      if (!obj || typeof obj !== "object") throw new Error("bad shape");
+      if (!Array.isArray(obj.campaigns) || !Array.isArray(obj.userLocations) || !obj.schedule) {
+        throw new Error("missing keys");
+      }
+      if (!confirm("Replace your current plan with the imported one? Your existing data will be overwritten (export it first if you want a copy).")) return;
+      state.campaigns = obj.campaigns;
+      state.userLocations = (obj.userLocations || []).map(L => {
+        if (L.cities && L.country) return L;
+        const cities = L.cities ? L.cities : (L.area ? (L.area === "AD + DXB" ? ["Abu Dhabi","Dubai"] : [L.area]) : []);
+        const country = L.country || "United Arab Emirates";
+        const { area, ...rest } = L;
+        return { ...rest, country, cities };
+      });
+      // Validate schedule arrays
+      const base = emptySchedule();
+      for (const k of Object.keys(obj.schedule || {})) {
+        if (k in base && Array.isArray(obj.schedule[k]) && obj.schedule[k].length === WEEK_COUNT) {
+          base[k] = obj.schedule[k];
+        }
+      }
+      state.schedule = base;
+      // Ensure any user locations in imported data have schedule entries
+      for (const L of state.userLocations) {
+        if (!state.schedule[cellKey(L.id, "main")]) state.schedule[cellKey(L.id, "main")] = Array(WEEK_COUNT).fill(null);
+        if (!state.schedule[cellKey(L.id, "overlay")]) state.schedule[cellKey(L.id, "overlay")] = Array(WEEK_COUNT).fill(null);
+      }
+      saveState();
+      rerenderAll();
+      toast("Plan imported");
+    } catch (err) {
+      toast("Invalid file — expected an OOH plan export");
+    }
+  };
+  reader.readAsText(file);
+}
+
 
 // Resize an image File to max 320x180 at JPEG q=0.8; returns a Promise<dataURL>
 function resizeImageToDataURL(file, maxW, maxH, quality) {
@@ -1835,19 +2467,72 @@ function openLocationEditor(existing) {
   wrap.className = "modal-backdrop";
   wrap.addEventListener("click", (e) => { if (e.target === wrap) closeModal(); });
 
+  // Known country + city suggestions (pre-seeded; user can type anything)
+  const COUNTRY_SUGGESTIONS = ["United Arab Emirates", "Saudi Arabia", "Qatar", "Bahrain", "Kuwait", "Oman", "Egypt", "Jordan", "Morocco"];
+  const CITY_SUGGESTIONS_BY_COUNTRY = {
+    "United Arab Emirates": ["Dubai","Abu Dhabi","Sharjah","Ajman","Ras Al Khaimah","Fujairah","Umm Al Quwain","Al Ain"],
+    "Saudi Arabia": ["Riyadh","Jeddah","Mecca","Medina","Dammam","Khobar"],
+    "Qatar": ["Doha","Al Rayyan","Al Wakrah"],
+    "Bahrain": ["Manama","Muharraq","Riffa"],
+    "Kuwait": ["Kuwait City","Hawalli","Salmiya"],
+    "Oman": ["Muscat","Salalah","Sohar"],
+    "Egypt": ["Cairo","Alexandria","Giza"],
+    "Jordan": ["Amman","Zarqa","Irbid"],
+    "Morocco": ["Casablanca","Rabat","Marrakesh"],
+  };
+
   // Draft state for the form
   const draft = {
     id: isNew ? ("loc_" + Math.random().toString(36).slice(2, 9)) : existing.id,
     name: isNew ? "" : existing.name,
-    area: isNew ? "Dubai" : existing.area,
-    screen: isNew ? "Digital" : existing.screen,
+    country: isNew ? "United Arab Emirates" : (existing.country || "United Arab Emirates"),
+    cities: isNew ? [] : Array.from(existing.cities || (existing.area ? [existing.area] : [])),
+    screen: isNew ? "Digital" : (["Digital","Static"].includes(existing.screen) ? existing.screen : "Digital"),
     faces: isNew ? 1 : existing.faces,
     notes: isNew ? "" : (existing.notes || ""),
     photo: isNew ? "" : (existing.photo || ""),
   };
   let photoBusy = false;
+  let cityInputVal = "";
 
   const render = () => {
+    // City suggestions: union of (known for this country) + (already used across all locations)
+    const knownSet = new Set(CITY_SUGGESTIONS_BY_COUNTRY[draft.country] || []);
+    for (const L of allLocations()) {
+      (L.cities || []).forEach(c => knownSet.add(c));
+      if (L.area) knownSet.add(L.area);  // legacy
+    }
+    // Filter: remove already-chosen, filter by typed prefix
+    const typed = cityInputVal.toLowerCase().trim();
+    const citySugg = Array.from(knownSet)
+      .filter(c => !draft.cities.includes(c))
+      .filter(c => !typed || c.toLowerCase().includes(typed))
+      .sort((a,b) => a.localeCompare(b))
+      .slice(0, 8);
+
+    const cityPillsHtml = draft.cities.map((c, i) =>
+      '<span class="city-pill"><span>' + escapeHtml(c) + '</span>' +
+      '<button type="button" class="city-pill-x" data-rm-city="' + i + '" aria-label="Remove">' +
+      '<svg width="10" height="10" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>'
+    ).join("");
+
+    const showSugg = document.activeElement && document.activeElement.id === "lx-city-input" || cityInputVal.length > 0;
+    const cityDropdownHtml = citySugg.length ?
+      '<div class="city-dropdown">' +
+        citySugg.map(c =>
+          '<button type="button" class="city-dropdown-item" data-add-city="' + escapeAttr(c) + '">' + escapeHtml(c) +
+            (CITY_SUGGESTIONS_BY_COUNTRY[draft.country] && CITY_SUGGESTIONS_BY_COUNTRY[draft.country].includes(c) ? '' : ' <span style="color: var(--text-3); font-size: 10px;">custom</span>') +
+          '</button>'
+        ).join("") +
+        (typed && !citySugg.map(c=>c.toLowerCase()).includes(typed) && !draft.cities.map(c=>c.toLowerCase()).includes(typed) ?
+          '<button type="button" class="city-dropdown-item city-dropdown-add" data-add-city="' + escapeAttr(cityInputVal.trim()) + '">+ Add "' + escapeHtml(cityInputVal.trim()) + '"</button>' : '') +
+      '</div>'
+      : (typed && !draft.cities.map(c=>c.toLowerCase()).includes(typed) ?
+        '<div class="city-dropdown">' +
+          '<button type="button" class="city-dropdown-item city-dropdown-add" data-add-city="' + escapeAttr(cityInputVal.trim()) + '">+ Add "' + escapeHtml(cityInputVal.trim()) + '"</button>' +
+        '</div>'
+        : '');
+
     wrap.innerHTML =
       '<div class="modal">' +
         '<div class="modal-head">' +
@@ -1871,7 +2556,7 @@ function openLocationEditor(existing) {
                 '<div class="photo-drop-hint">' +
                   '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M8 5l1.5-2h5L16 5"/></svg>' +
                   '<div class="photo-drop-hint-main">' + (photoBusy ? "Processing…" : "Tap to upload or drop a photo") + '</div>' +
-                  '<div class="photo-drop-hint-sub">JPG / PNG · optional · auto-sized to 320×180</div>' +
+                  '<div class="photo-drop-hint-sub">JPG / PNG · optional · auto-sized</div>' +
                 '</div>'
               ) +
               (draft.photo ? '' : '<input type="file" id="lx-file" accept="image/*">') +
@@ -1884,39 +2569,43 @@ function openLocationEditor(existing) {
             '<input class="field-input" id="lx-name" placeholder="e.g. Yas Marina Digital Wall" autocomplete="off" maxlength="80" value="' + escapeAttr(draft.name) + '">' +
           '</div>' +
 
-          // CITY + FORMAT
-          '<div class="field-row">' +
-            '<div class="field">' +
-              '<label class="field-label" for="lx-area">City / market</label>' +
-              '<input list="lx-area-list" class="field-input" id="lx-area" placeholder="e.g. Dubai" autocomplete="off" maxlength="40" value="' + escapeAttr(draft.area) + '">' +
-              '<datalist id="lx-area-list">' +
-                '<option value="Dubai">' +
-                '<option value="Abu Dhabi">' +
-                '<option value="AD + DXB">' +
-                '<option value="Sharjah">' +
-                '<option value="Ajman">' +
-                '<option value="Ras Al Khaimah">' +
-                '<option value="Al Ain">' +
-              '</datalist>' +
-            '</div>' +
-            '<div class="field">' +
-              '<label class="field-label" for="lx-screen">Format</label>' +
-              '<select class="filter-select" style="width:100%;" id="lx-screen">' +
-                ['Digital','Static','Indoor'].map(s => '<option value="'+s+'"' + (draft.screen===s ? ' selected' : '') + '>' + s + (s==='Static' ? ' hoarding' : s==='Indoor' ? ' digital' : '') + '</option>').join("") +
-              '</select>' +
+          // COUNTRY
+          '<div class="field">' +
+            '<label class="field-label" for="lx-country">Country</label>' +
+            '<input list="lx-country-list" class="field-input" id="lx-country" placeholder="Country name" autocomplete="off" maxlength="60" value="' + escapeAttr(draft.country) + '">' +
+            '<datalist id="lx-country-list">' +
+              COUNTRY_SUGGESTIONS.map(c => '<option value="' + escapeAttr(c) + '">').join("") +
+            '</datalist>' +
+          '</div>' +
+
+          // CITIES (multi-select)
+          '<div class="field">' +
+            '<label class="field-label">Cities <span style="color: var(--text-3); font-weight: 400; letter-spacing: 0;">· pick one or more</span></label>' +
+            '<div class="city-input-wrap" id="lx-city-wrap">' +
+              '<div class="city-pills">' + cityPillsHtml + '</div>' +
+              '<input type="text" class="city-input" id="lx-city-input" placeholder="' + (draft.cities.length ? "Add another…" : "Type to pick or add a city") + '" autocomplete="off" value="' + escapeAttr(cityInputVal) + '">' +
+              cityDropdownHtml +
             '</div>' +
           '</div>' +
 
-          // FACES + NOTES
+          // FORMAT + FACES
           '<div class="field-row">' +
+            '<div class="field">' +
+              '<label class="field-label" for="lx-screen">Format</label>' +
+              '<select class="filter-select" style="width:100%;" id="lx-screen">' +
+                ['Digital','Static'].map(s => '<option value="'+s+'"' + (draft.screen===s ? ' selected' : '') + '>' + s + (s==='Static' ? ' hoarding' : '') + '</option>').join("") +
+              '</select>' +
+            '</div>' +
             '<div class="field">' +
               '<label class="field-label" for="lx-faces">Volume of faces</label>' +
               '<input type="number" min="1" step="1" class="field-input" id="lx-faces" placeholder="e.g. 12" value="' + draft.faces + '">' +
             '</div>' +
-            '<div class="field">' +
-              '<label class="field-label" for="lx-notes">Notes (optional)</label>' +
-              '<input class="field-input" id="lx-notes" placeholder="e.g. 8 mo paid + 2 mo FOC" autocomplete="off" maxlength="80" value="' + escapeAttr(draft.notes) + '">' +
-            '</div>' +
+          '</div>' +
+
+          // NOTES
+          '<div class="field">' +
+            '<label class="field-label" for="lx-notes">Notes (optional)</label>' +
+            '<input class="field-input" id="lx-notes" placeholder="e.g. 8 mo paid + 2 mo FOC" autocomplete="off" maxlength="80" value="' + escapeAttr(draft.notes) + '">' +
           '</div>' +
 
         '</div>' +
@@ -1933,13 +2622,105 @@ function openLocationEditor(existing) {
     wrap.querySelector("#lx-close").addEventListener("click", closeModal);
     wrap.querySelector("#lx-cancel").addEventListener("click", closeModal);
 
-    // Name input: bind, auto-focus in new mode
+    // Name
     const nameEl = wrap.querySelector("#lx-name");
     nameEl.addEventListener("input", e => draft.name = e.target.value);
     nameEl.addEventListener("keydown", e => { if (e.key === "Enter") doSave(); });
-    if (isNew && !draft.photo) { /* focus photo drop first */ } else { nameEl.focus(); }
+    if (!isNew) nameEl.focus();
 
-    wrap.querySelector("#lx-area").addEventListener("input", e => draft.area = e.target.value);
+    // Country
+    wrap.querySelector("#lx-country").addEventListener("input", e => {
+      draft.country = e.target.value;
+      // Re-render to update city suggestions based on new country
+      render();
+    });
+
+    // Cities — input. Don't full-rerender on each keystroke (loses focus). Only
+    // update the dropdown element in place.
+    const cityInput = wrap.querySelector("#lx-city-input");
+    const updateDropdown = () => {
+      const knownSet = new Set(CITY_SUGGESTIONS_BY_COUNTRY[draft.country] || []);
+      for (const L of allLocations()) {
+        (L.cities || []).forEach(c => knownSet.add(c));
+        if (L.area) knownSet.add(L.area);
+      }
+      const typed = cityInputVal.toLowerCase().trim();
+      const citySugg = Array.from(knownSet)
+        .filter(c => !draft.cities.includes(c))
+        .filter(c => !typed || c.toLowerCase().includes(typed))
+        .sort((a,b) => a.localeCompare(b))
+        .slice(0, 8);
+
+      const existingDd = wrap.querySelector(".city-dropdown");
+      if (existingDd) existingDd.remove();
+
+      let html = "";
+      if (citySugg.length || (typed && !draft.cities.map(c=>c.toLowerCase()).includes(typed))) {
+        html = '<div class="city-dropdown">' +
+          citySugg.map(c =>
+            '<button type="button" class="city-dropdown-item" data-add-city="' + escapeAttr(c) + '">' + escapeHtml(c) +
+              (CITY_SUGGESTIONS_BY_COUNTRY[draft.country] && CITY_SUGGESTIONS_BY_COUNTRY[draft.country].includes(c) ? '' : ' <span style="color: var(--text-3); font-size: 10px;">custom</span>') +
+            '</button>'
+          ).join("") +
+          (typed && !citySugg.map(c=>c.toLowerCase()).includes(typed) && !draft.cities.map(c=>c.toLowerCase()).includes(typed) ?
+            '<button type="button" class="city-dropdown-item city-dropdown-add" data-add-city="' + escapeAttr(cityInputVal.trim()) + '">+ Add "' + escapeHtml(cityInputVal.trim()) + '"</button>' : '') +
+        '</div>';
+      }
+      if (html) {
+        wrap.querySelector("#lx-city-wrap").insertAdjacentHTML("beforeend", html);
+        wrap.querySelectorAll(".city-dropdown [data-add-city]").forEach(btn => {
+          btn.addEventListener("mousedown", e => e.preventDefault());
+          btn.addEventListener("click", () => addCity(btn.dataset.addCity));
+        });
+      }
+    };
+
+    const addCity = (v) => {
+      if (!v) return;
+      v = v.trim();
+      if (!v || draft.cities.map(c=>c.toLowerCase()).includes(v.toLowerCase())) return;
+      draft.cities.push(v);
+      cityInputVal = "";
+      render();  // full re-render to show new pill
+      setTimeout(() => {
+        const el = wrap.querySelector("#lx-city-input");
+        if (el) el.focus();
+      }, 0);
+    };
+
+    cityInput.addEventListener("input", e => {
+      cityInputVal = e.target.value;
+      updateDropdown();
+    });
+    cityInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addCity(cityInputVal);
+      } else if (e.key === "Backspace" && !cityInputVal && draft.cities.length > 0) {
+        draft.cities.pop();
+        render();
+        setTimeout(() => wrap.querySelector("#lx-city-input") && wrap.querySelector("#lx-city-input").focus(), 0);
+      }
+    });
+    cityInput.addEventListener("focus", updateDropdown);
+    cityInput.addEventListener("blur", () => {
+      // Keep dropdown visible briefly to allow mousedown-click to register
+      setTimeout(() => {
+        const dd = wrap.querySelector(".city-dropdown");
+        if (dd && document.activeElement !== cityInput) dd.remove();
+      }, 200);
+    });
+
+    // Remove pill buttons
+    wrap.querySelectorAll("[data-rm-city]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.rmCity, 10);
+        draft.cities.splice(i, 1);
+        render();
+      });
+    });
+
+    // Format + faces + notes
     wrap.querySelector("#lx-screen").addEventListener("change", e => draft.screen = e.target.value);
     wrap.querySelector("#lx-faces").addEventListener("input", e => {
       const v = parseInt(e.target.value, 10);
@@ -1947,7 +2728,7 @@ function openLocationEditor(existing) {
     });
     wrap.querySelector("#lx-notes").addEventListener("input", e => draft.notes = e.target.value);
 
-    // File input
+    // Photo upload
     const fileInput = wrap.querySelector("#lx-file");
     if (fileInput) {
       fileInput.addEventListener("change", async e => {
@@ -1957,19 +2738,14 @@ function openLocationEditor(existing) {
         if (file.size > 20 * 1024 * 1024) { toast("Image too large (max 20 MB)"); return; }
         photoBusy = true; render();
         try {
-          draft.photo = await resizeImageToDataURL(file, 320, 180, 0.8);
-        } catch (err) {
-          toast("Couldn't process that image");
-        } finally {
-          photoBusy = false; render();
-        }
+          draft.photo = await resizeImageToDataURL(file, 640, 360, 0.78);
+        } catch (err) { toast("Couldn't process that image"); }
+        finally { photoBusy = false; render(); }
       });
     }
-    // Remove photo button
     const rm = wrap.querySelector("#lx-remove");
     if (rm) rm.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); draft.photo = ""; render(); });
 
-    // Drag & drop
     const drop = wrap.querySelector("#lx-drop");
     if (drop) {
       drop.addEventListener("dragenter", e => { e.preventDefault(); drop.classList.add("dragover"); });
@@ -1981,17 +2757,14 @@ function openLocationEditor(existing) {
         if (!file) return;
         if (!file.type.startsWith("image/")) { toast("Please drop an image file"); return; }
         photoBusy = true; render();
-        try {
-          draft.photo = await resizeImageToDataURL(file, 320, 180, 0.8);
-        } catch (err) { toast("Couldn't process that image"); }
+        try { draft.photo = await resizeImageToDataURL(file, 640, 360, 0.78); }
+        catch (err) { toast("Couldn't process that image"); }
         finally { photoBusy = false; render(); }
       });
     }
 
-    // Save
     wrap.querySelector("#lx-save").addEventListener("click", doSave);
 
-    // Delete
     const delBtn = wrap.querySelector("#lx-del");
     if (delBtn) delBtn.addEventListener("click", () => {
       if (!confirm('Delete "' + existing.name + '"? Any campaigns scheduled for this location will also be cleared.')) return;
@@ -2008,19 +2781,20 @@ function openLocationEditor(existing) {
   function doSave() {
     const name = (draft.name || "").trim();
     if (!name) { toast("Name is required"); return; }
-    const area = (draft.area || "").trim() || "Custom";
-    if (!["Digital","Static","Indoor"].includes(draft.screen)) draft.screen = "Digital";
+    const country = (draft.country || "").trim() || "—";
+    const cities = (draft.cities || []).map(c => c.trim()).filter(Boolean);
+    if (cities.length === 0) { toast("Pick at least one city"); return; }
+    if (!["Digital","Static"].includes(draft.screen)) draft.screen = "Digital";
     const faces = Math.max(1, parseInt(draft.faces, 10) || 1);
 
     const entry = {
-      id: draft.id, name, area, screen: draft.screen, faces,
+      id: draft.id, name, country, cities, screen: draft.screen, faces,
       photo: draft.photo || "", notes: (draft.notes || "").trim(),
       user: true,
     };
 
     if (isNew) {
       state.userLocations = [...state.userLocations, entry];
-      // Initialise schedule slots for the new location
       state.schedule[cellKey(entry.id, "main")] = Array(WEEK_COUNT).fill(null);
       state.schedule[cellKey(entry.id, "overlay")] = Array(WEEK_COUNT).fill(null);
     } else {
@@ -2103,11 +2877,20 @@ function bindEvents() {
     rerenderAll();
   });
   document.getElementById("add-campaign").addEventListener("click", () => {
-    if (state.campaigns.length >= 20) { toast("All 20 campaign slots are in use"); return; }
+    if (state.campaigns.length >= MAX_CAMPAIGNS) { toast("All " + MAX_CAMPAIGNS + " campaign slots are in use"); return; }
     openCampaignEditor(null);
   });
   document.getElementById("add-location").addEventListener("click", () => {
     openLocationEditor(null);
+  });
+  // Export / Import
+  document.getElementById("btn-export").addEventListener("click", exportStateAsJSON);
+  const importFileEl = document.getElementById("import-file");
+  document.getElementById("btn-import").addEventListener("click", () => importFileEl.click());
+  importFileEl.addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) importStateFromFile(f);
+    e.target.value = "";  // allow re-importing the same file
   });
   document.getElementById("camp-search").addEventListener("input", e => {
     state.campSearch = e.target.value;
@@ -2152,6 +2935,10 @@ function init() {
   rerenderAll();
   bindEvents();
   setInterval(renderDate, 60 * 1000);
+  // Connect to shared Firebase database — remote state will overlay local
+  // cache as soon as it arrives. If Firebase is unreachable we stay in
+  // localStorage-only mode gracefully.
+  initFirebase();
 }
 
 document.addEventListener("DOMContentLoaded", init);
