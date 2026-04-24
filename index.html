@@ -1388,6 +1388,9 @@ function saveState() {
    back by Firebase and ignored via the myLastWriteAt timestamp.
 */
 
+// Enable verbose console logging with ?debug=1 in the URL
+const DEBUG = (typeof location !== "undefined") && /[?&]debug=1\b/.test(location.search);
+
 const FB_CONFIG = {
   databaseURL: "https://ooh-bcf22-default-rtdb.firebaseio.com/",
   projectId:   "ooh-bcf22",
@@ -1562,8 +1565,18 @@ function applyRemoteSnapshot(remote) {
       return [];
     };
 
-    state.campaigns     = asArray(remote.campaigns);
-    state.userLocations = asArray(remote.userLocations);
+    // CRITICAL: only replace each top-level field if the remote actually
+    // carries it. Firebase strips empty arrays/objects on write, so a remote
+    // that legitimately has no userLocations or no schedule would otherwise
+    // wipe our local state — including campaigns — causing the Gantt to
+    // render the right schedule with the wrong (empty) campaign register,
+    // which makes cells appear blank.
+    if (Object.prototype.hasOwnProperty.call(remote, "campaigns") && remote.campaigns != null) {
+      state.campaigns = asArray(remote.campaigns);
+    }
+    if (Object.prototype.hasOwnProperty.call(remote, "userLocations") && remote.userLocations != null) {
+      state.userLocations = asArray(remote.userLocations);
+    }
 
     if (remote.schedule && typeof remote.schedule === "object") {
       // Start from empty schedule (all known locations), then overlay whatever
@@ -1571,14 +1584,7 @@ function applyRemoteSnapshot(remote) {
       // possibly-sparse-object representation back to a proper 40-slot array.
       const base = emptySchedule();
       for (const k of Object.keys(remote.schedule)) {
-        if (k in base) {
-          base[k] = normalizeScheduleArray(remote.schedule[k]);
-        } else {
-          // Unknown location key — e.g. a user-added location that isn't in
-          // our local state yet. Keep it anyway so the Gantt can render it
-          // after state.userLocations arrives.
-          base[k] = normalizeScheduleArray(remote.schedule[k]);
-        }
+        base[k] = normalizeScheduleArray(remote.schedule[k]);
       }
       state.schedule = base;
     }
@@ -1590,6 +1596,15 @@ function applyRemoteSnapshot(remote) {
       const ko = cellKey(L.id, "overlay");
       if (!state.schedule[km]) state.schedule[km] = Array(WEEK_COUNT).fill(null);
       if (!state.schedule[ko]) state.schedule[ko] = Array(WEEK_COUNT).fill(null);
+    }
+
+    if (DEBUG) {
+      console.log("[sync] applied remote snapshot", {
+        campaigns: state.campaigns.length,
+        userLocations: state.userLocations.length,
+        scheduleKeys: Object.keys(state.schedule).length,
+        scheduledWeeks: Object.values(state.schedule).reduce((n, arr) => n + arr.filter(x=>x!=null).length, 0),
+      });
     }
 
     saveStateLocal();   // keep cache fresh
@@ -3023,6 +3038,57 @@ function init() {
 }
 
 document.addEventListener("DOMContentLoaded", init);
+
+// Diagnostic helper — paste `oohDebug()` in DevTools console to inspect state
+window.oohDebug = function() {
+  const scheduledEntries = Object.entries(state.schedule)
+    .map(([k, arr]) => [k, (arr || []).filter(x => x != null).length])
+    .filter(([k, n]) => n > 0);
+  const knownCampIds = new Set(state.campaigns.map(c => c.id));
+  const orphanCellRefs = [];
+  for (const [k, arr] of Object.entries(state.schedule)) {
+    for (let i = 0; i < (arr||[]).length; i++) {
+      if (arr[i] && !knownCampIds.has(arr[i])) orphanCellRefs.push({key:k, week:i, campId:arr[i]});
+    }
+  }
+  const snapshot = {
+    sessionId,
+    fbReady,
+    syncStatus: document.getElementById("sync-pill")?.dataset.status,
+    syncText: document.getElementById("sync-text")?.textContent,
+    "state.campaigns.length": state.campaigns.length,
+    "state.campaigns.ids": state.campaigns.map(c => c.id),
+    "state.userLocations.length": state.userLocations.length,
+    "schedule entries with data": scheduledEntries,
+    "orphan cell references (schedule points at campaign id not in state.campaigns)":
+      orphanCellRefs.length > 0 ? orphanCellRefs : "none",
+  };
+  console.log("=== OOH dashboard state ===");
+  console.table(snapshot);
+  if (fbReady) {
+    console.log("Fetching live Firebase /plan…");
+    fbDb.ref("plan").once("value").then(s => {
+      const r = s.val() || {};
+      const schedKeys = r.schedule ? Object.keys(r.schedule) : [];
+      const schedSample = schedKeys.length
+        ? { [schedKeys[0]]: r.schedule[schedKeys[0]] }
+        : "(empty)";
+      console.log("=== Firebase /plan ===");
+      console.table({
+        "remote has campaigns field": "campaigns" in r,
+        "remote.campaigns type": Array.isArray(r.campaigns) ? "Array" : typeof r.campaigns,
+        "remote.campaigns length": Array.isArray(r.campaigns) ? r.campaigns.length : "(n/a)",
+        "remote has userLocations": "userLocations" in r,
+        "remote has schedule": "schedule" in r,
+        "remote.schedule keys": schedKeys.length,
+        "remote.schedule sample": JSON.stringify(schedSample),
+        "remote._updatedBy": r._updatedBy,
+        "remote._updatedAt": r._updatedAt && new Date(r._updatedAt).toISOString(),
+      });
+    });
+  }
+  return snapshot;
+};
 </script>
 
 <script>
