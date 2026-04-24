@@ -2,9 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="description" content="2026 OOH Annual Plan - DCT Abu Dhabi SM&C. Live out-of-home media planning with weekly campaign allocations from March through December.">
+<meta property="og:title" content="2026 OOH Annual Plan - DCT Abu Dhabi">
+<meta property="og:description" content="Live OOH planning dashboard with weekly campaign allocations.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://visitabudhabi.ae/-/media/project/vad/campaign/winter-landing-mfd/article/winter-in-abu-dhabi.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="2026 OOH Annual Plan - DCT Abu Dhabi">
+<meta name="twitter:description" content="Live OOH planning dashboard with weekly campaign allocations.">
+<link rel="icon" href="https://visitabudhabi.ae/dist/vad/favicon.ico" type="image/x-icon">
+<link rel="shortcut icon" href="https://visitabudhabi.ae/dist/vad/favicon.ico" type="image/x-icon">
 <meta name="theme-color" content="#0D1119">
-<title>UAE OOH 2026 · DCT Abu Dhabi SM&amp;C</title>
+<title>2026 OOH Annual Plan - DCT Abu Dhabi</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -2645,52 +2659,49 @@ function openLocationEditor(existing) {
     id: isNew ? ("loc_" + Math.random().toString(36).slice(2, 9)) : existing.id,
     name: isNew ? "" : existing.name,
     country: isNew ? "United Arab Emirates" : (existing.country || "United Arab Emirates"),
-    cities: isNew ? [] : Array.from(existing.cities || (existing.area ? [existing.area] : [])),
+    // Single-city model. For backward compat we pick the first element from
+    // a legacy cities array, or fall back to the legacy `area` field.
+    city: isNew ? "" : (
+      (existing.cities && existing.cities.length > 0) ? existing.cities[0]
+      : (existing.area || "")
+    ),
     screen: isNew ? "Digital" : (["Digital","Static"].includes(existing.screen) ? existing.screen : "Digital"),
     faces: isNew ? 1 : existing.faces,
     notes: isNew ? "" : (existing.notes || ""),
     photo: isNew ? "" : (existing.photo || ""),
   };
   let photoBusy = false;
-  let cityInputVal = "";
 
   const render = () => {
-    // City suggestions: union of (known for this country) + (already used across all locations)
+    // City suggestions come from: this country's known cities + every city
+    // already used elsewhere in the system. We only compute this when the user
+    // is actively typing — suggestions stay hidden on focus/empty.
     const knownSet = new Set(CITY_SUGGESTIONS_BY_COUNTRY[draft.country] || []);
     for (const L of allLocations()) {
       (L.cities || []).forEach(c => knownSet.add(c));
       if (L.area) knownSet.add(L.area);  // legacy
     }
-    // Filter: remove already-chosen, filter by typed prefix
-    const typed = cityInputVal.toLowerCase().trim();
-    const citySugg = Array.from(knownSet)
-      .filter(c => !draft.cities.includes(c))
-      .filter(c => !typed || c.toLowerCase().includes(typed))
-      .sort((a,b) => a.localeCompare(b))
-      .slice(0, 8);
+    const typed = (draft.city || "").toLowerCase().trim();
+    const citySugg = typed.length > 0
+      ? Array.from(knownSet)
+          .filter(c => c.toLowerCase() !== typed)
+          .filter(c => c.toLowerCase().includes(typed))
+          .sort((a,b) => {
+            // Prefixes first, then substring matches, both alphabetical
+            const ap = a.toLowerCase().startsWith(typed) ? 0 : 1;
+            const bp = b.toLowerCase().startsWith(typed) ? 0 : 1;
+            return ap - bp || a.localeCompare(b);
+          })
+          .slice(0, 8)
+      : [];
 
-    const cityPillsHtml = draft.cities.map((c, i) =>
-      '<span class="city-pill"><span>' + escapeHtml(c) + '</span>' +
-      '<button type="button" class="city-pill-x" data-rm-city="' + i + '" aria-label="Remove">' +
-      '<svg width="10" height="10" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></span>'
-    ).join("");
-
-    const showSugg = document.activeElement && document.activeElement.id === "lx-city-input" || cityInputVal.length > 0;
-    const cityDropdownHtml = citySugg.length ?
-      '<div class="city-dropdown">' +
-        citySugg.map(c =>
-          '<button type="button" class="city-dropdown-item" data-add-city="' + escapeAttr(c) + '">' + escapeHtml(c) +
-            (CITY_SUGGESTIONS_BY_COUNTRY[draft.country] && CITY_SUGGESTIONS_BY_COUNTRY[draft.country].includes(c) ? '' : ' <span style="color: var(--text-3); font-size: 10px;">custom</span>') +
-          '</button>'
-        ).join("") +
-        (typed && !citySugg.map(c=>c.toLowerCase()).includes(typed) && !draft.cities.map(c=>c.toLowerCase()).includes(typed) ?
-          '<button type="button" class="city-dropdown-item city-dropdown-add" data-add-city="' + escapeAttr(cityInputVal.trim()) + '">+ Add "' + escapeHtml(cityInputVal.trim()) + '"</button>' : '') +
-      '</div>'
-      : (typed && !draft.cities.map(c=>c.toLowerCase()).includes(typed) ?
-        '<div class="city-dropdown">' +
-          '<button type="button" class="city-dropdown-item city-dropdown-add" data-add-city="' + escapeAttr(cityInputVal.trim()) + '">+ Add "' + escapeHtml(cityInputVal.trim()) + '"</button>' +
+    const cityDropdownHtml = citySugg.length
+      ? '<div class="city-dropdown">' +
+          citySugg.map(c =>
+            '<button type="button" class="city-dropdown-item" data-set-city="' + escapeAttr(c) + '">' + escapeHtml(c) + '</button>'
+          ).join("") +
         '</div>'
-        : '');
+      : '';
 
     // Context flags for labels
     const editingBase = !isNew && isBaseLocationId(draft.id);
@@ -2716,7 +2727,7 @@ function openLocationEditor(existing) {
             '<label class="field-label">Photo</label>' +
             '<div class="photo-drop" id="lx-drop">' +
               (draft.photo ?
-                '<img class="photo-drop-preview" src="' + escapeAttr(draft.photo) + '" alt="">' +
+                '<img class="photo-drop-preview" src="' + escapeAttr(photoSrc(draft)) + '" alt="">' +
                 '<button type="button" class="photo-drop-remove" id="lx-remove" aria-label="Remove photo"><svg width="12" height="12" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>'
               :
                 '<div class="photo-drop-hint">' +
@@ -2747,12 +2758,11 @@ function openLocationEditor(existing) {
             '</select>' +
           '</div>' +
 
-          // CITIES (multi-select)
+          // CITY (single field, autocomplete while typing)
           '<div class="field">' +
-            '<label class="field-label">Cities <span style="color: var(--text-3); font-weight: 400; letter-spacing: 0;">· pick one or more</span></label>' +
+            '<label class="field-label" for="lx-city-input">City</label>' +
             '<div class="city-input-wrap" id="lx-city-wrap">' +
-              '<div class="city-pills">' + cityPillsHtml + '</div>' +
-              '<input type="text" class="city-input" id="lx-city-input" placeholder="' + (draft.cities.length ? "Add another…" : "Type to pick or add a city") + '" autocomplete="off" value="' + escapeAttr(cityInputVal) + '">' +
+              '<input type="text" class="city-input" id="lx-city-input" dir="ltr" placeholder="Type a city" autocomplete="off" maxlength="60" value="' + escapeAttr(draft.city || "") + '">' +
               cityDropdownHtml +
             '</div>' +
           '</div>' +
@@ -2807,89 +2817,63 @@ function openLocationEditor(existing) {
       render();
     });
 
-    // Cities — input. Don't full-rerender on each keystroke (loses focus). Only
-    // update the dropdown element in place.
+    // City — single-field autocomplete. Dropdown appears only while typing.
     const cityInput = wrap.querySelector("#lx-city-input");
+
     const updateDropdown = () => {
+      const typed = (draft.city || "").toLowerCase().trim();
+      const existingDd = wrap.querySelector(".city-dropdown");
+      if (existingDd) existingDd.remove();
+      if (!typed) return;   // never show on empty
+
       const knownSet = new Set(CITY_SUGGESTIONS_BY_COUNTRY[draft.country] || []);
       for (const L of allLocations()) {
         (L.cities || []).forEach(c => knownSet.add(c));
         if (L.area) knownSet.add(L.area);
       }
-      const typed = cityInputVal.toLowerCase().trim();
       const citySugg = Array.from(knownSet)
-        .filter(c => !draft.cities.includes(c))
-        .filter(c => !typed || c.toLowerCase().includes(typed))
-        .sort((a,b) => a.localeCompare(b))
+        .filter(c => c.toLowerCase() !== typed)
+        .filter(c => c.toLowerCase().includes(typed))
+        .sort((a,b) => {
+          const ap = a.toLowerCase().startsWith(typed) ? 0 : 1;
+          const bp = b.toLowerCase().startsWith(typed) ? 0 : 1;
+          return ap - bp || a.localeCompare(b);
+        })
         .slice(0, 8);
+      if (citySugg.length === 0) return;
 
-      const existingDd = wrap.querySelector(".city-dropdown");
-      if (existingDd) existingDd.remove();
-
-      let html = "";
-      if (citySugg.length || (typed && !draft.cities.map(c=>c.toLowerCase()).includes(typed))) {
-        html = '<div class="city-dropdown">' +
-          citySugg.map(c =>
-            '<button type="button" class="city-dropdown-item" data-add-city="' + escapeAttr(c) + '">' + escapeHtml(c) +
-              (CITY_SUGGESTIONS_BY_COUNTRY[draft.country] && CITY_SUGGESTIONS_BY_COUNTRY[draft.country].includes(c) ? '' : ' <span style="color: var(--text-3); font-size: 10px;">custom</span>') +
-            '</button>'
-          ).join("") +
-          (typed && !citySugg.map(c=>c.toLowerCase()).includes(typed) && !draft.cities.map(c=>c.toLowerCase()).includes(typed) ?
-            '<button type="button" class="city-dropdown-item city-dropdown-add" data-add-city="' + escapeAttr(cityInputVal.trim()) + '">+ Add "' + escapeHtml(cityInputVal.trim()) + '"</button>' : '') +
-        '</div>';
-      }
-      if (html) {
-        wrap.querySelector("#lx-city-wrap").insertAdjacentHTML("beforeend", html);
-        wrap.querySelectorAll(".city-dropdown [data-add-city]").forEach(btn => {
-          btn.addEventListener("mousedown", e => e.preventDefault());
-          btn.addEventListener("click", () => addCity(btn.dataset.addCity));
+      const html = '<div class="city-dropdown">' +
+        citySugg.map(c => '<button type="button" class="city-dropdown-item" data-set-city="' + escapeAttr(c) + '">' + escapeHtml(c) + '</button>').join("") +
+      '</div>';
+      wrap.querySelector("#lx-city-wrap").insertAdjacentHTML("beforeend", html);
+      wrap.querySelectorAll(".city-dropdown [data-set-city]").forEach(btn => {
+        btn.addEventListener("mousedown", e => e.preventDefault());
+        btn.addEventListener("click", () => {
+          draft.city = btn.dataset.setCity;
+          cityInput.value = draft.city;
+          const dd = wrap.querySelector(".city-dropdown");
+          if (dd) dd.remove();
+          cityInput.focus();
         });
-      }
-    };
-
-    const addCity = (v) => {
-      if (!v) return;
-      v = v.trim();
-      if (!v || draft.cities.map(c=>c.toLowerCase()).includes(v.toLowerCase())) return;
-      draft.cities.push(v);
-      cityInputVal = "";
-      render();  // full re-render to show new pill
-      setTimeout(() => {
-        const el = wrap.querySelector("#lx-city-input");
-        if (el) el.focus();
-      }, 0);
+      });
     };
 
     cityInput.addEventListener("input", e => {
-      cityInputVal = e.target.value;
+      draft.city = e.target.value;
       updateDropdown();
     });
     cityInput.addEventListener("keydown", e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        addCity(cityInputVal);
-      } else if (e.key === "Backspace" && !cityInputVal && draft.cities.length > 0) {
-        draft.cities.pop();
-        render();
-        setTimeout(() => wrap.querySelector("#lx-city-input") && wrap.querySelector("#lx-city-input").focus(), 0);
+      if (e.key === "Escape") {
+        const dd = wrap.querySelector(".city-dropdown");
+        if (dd) dd.remove();
       }
     });
-    cityInput.addEventListener("focus", updateDropdown);
     cityInput.addEventListener("blur", () => {
-      // Keep dropdown visible briefly to allow mousedown-click to register
+      // delay briefly so click on suggestion registers
       setTimeout(() => {
         const dd = wrap.querySelector(".city-dropdown");
         if (dd && document.activeElement !== cityInput) dd.remove();
       }, 200);
-    });
-
-    // Remove pill buttons
-    wrap.querySelectorAll("[data-rm-city]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const i = parseInt(btn.dataset.rmCity, 10);
-        draft.cities.splice(i, 1);
-        render();
-      });
     });
 
     // Format + faces + notes
@@ -2968,8 +2952,10 @@ function openLocationEditor(existing) {
     const name = (draft.name || "").trim();
     if (!name) { toast("Name is required"); return; }
     const country = (draft.country || "").trim() || "—";
-    const cities = (draft.cities || []).map(c => c.trim()).filter(Boolean);
-    if (cities.length === 0) { toast("Pick at least one city"); return; }
+    const city = (draft.city || "").trim();
+    if (!city) { toast("City is required"); return; }
+    // Schema still carries cities[] for back-compat with any existing Firebase data
+    const cities = [city];
     if (!["Digital","Static"].includes(draft.screen)) draft.screen = "Digital";
     const faces = Math.max(1, parseInt(draft.faces, 10) || 1);
 
