@@ -396,6 +396,159 @@
      Gantt
      ========================================= */
   .gantt-panel { margin-bottom: 18px; }
+
+  /* Mobile location list — hidden on desktop. Takes over the Gantt area
+     at narrow viewports (below 768px) where a 40-week horizontal grid is
+     too cramped to use. */
+  .mobile-loc-list { display: none; padding: 4px 0; }
+  @media (max-width: 767px) {
+    #gantt-grid, .gantt-legend { display: none !important; }
+    .mobile-loc-list { display: block; }
+    #scroll-left, #scroll-right { display: none; }
+  }
+  .ml-card {
+    background: var(--surf);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin: 10px 0;
+    overflow: hidden;
+  }
+  .ml-card-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .ml-card-photo {
+    width: 36px; height: 36px;
+    border-radius: 5px;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid var(--line-2);
+  }
+  .ml-card-meta { flex: 1; min-width: 0; }
+  .ml-card-name {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .ml-card-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; align-items: center; }
+  .ml-card-actions { display: flex; gap: 4px; align-items: center; }
+  .ml-card-edit {
+    width: 28px; height: 28px;
+    border-radius: 5px;
+    background: transparent;
+    border: 1px solid var(--line-2);
+    color: var(--text-2);
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+  .ml-card-edit:hover { background: var(--surf-2); color: var(--text); }
+  .ml-card-chev {
+    width: 22px; height: 22px; display: grid; place-items: center;
+    color: var(--text-3); font-size: 14px;
+    transition: transform 150ms ease;
+  }
+  .ml-card.expanded .ml-card-chev { transform: rotate(90deg); }
+
+  /* 40-week strip — collapsed state overview */
+  .ml-strip {
+    display: flex;
+    gap: 1px;
+    padding: 0 12px 10px;
+    height: 14px;
+  }
+  .ml-strip-cell {
+    flex: 1;
+    background: var(--bg-2);
+    border-radius: 1px;
+  }
+  .ml-strip-cell.month-start {
+    border-left: 1px solid var(--line);
+  }
+  .ml-strip.static {
+    background-image: repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(245,158,11,0.06) 3px, rgba(245,158,11,0.06) 6px);
+  }
+
+  /* Expanded body — campaign runs + add */
+  .ml-card-body {
+    background: var(--bg-2);
+    border-top: 1px solid var(--line);
+  }
+  .ml-track-label {
+    font-size: 9px; font-family: var(--ff-mono);
+    color: var(--text-3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 8px 12px 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ml-track-label::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+  }
+  .ml-track-label.overlay::before { background: var(--amber); }
+  .ml-run {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border-top: 1px solid var(--line);
+    cursor: pointer;
+  }
+  .ml-run:hover { background: var(--surf-2); }
+  .ml-run-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .ml-run-info { flex: 1; min-width: 0; }
+  .ml-run-name {
+    font-size: 13px; font-weight: 500; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ml-run-range {
+    font-size: 10px; font-family: var(--ff-mono);
+    color: var(--text-2); margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+  .ml-run-chev { color: var(--text-3); font-size: 16px; }
+  .ml-add {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 11px 12px;
+    border-top: 1px solid var(--line);
+    color: var(--accent-2);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    background: transparent;
+    border-left: 0; border-right: 0; border-bottom: 0;
+    width: 100%;
+    font-family: var(--ff);
+  }
+  .ml-add:hover { background: var(--surf-2); color: white; }
+  .ml-empty {
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text-3);
+    text-align: center;
+    font-style: italic;
+  }
+  .ml-static-note {
+    padding: 8px 12px;
+    font-size: 10px;
+    color: var(--text-3);
+    font-family: var(--ff-mono);
+    letter-spacing: 0.05em;
+    font-style: italic;
+    background: rgba(245,158,11,0.04);
+    border-top: 1px solid var(--line);
+  }
+
+  /* Range picker inside add-campaign modal */
+  .ml-range-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px; align-items: center;
+    margin-top: 10px;
+  }
+  .ml-range-row .field-input { height: 38px; padding: 0 10px; }
+  .ml-range-sep { color: var(--text-3); font-size: 12px; }
+
+
   .gantt-actions { margin-left: auto; display: flex; gap: 6px; }
   .gantt-actions button {
     padding: 4px 8px;
@@ -1233,7 +1386,10 @@
       </div>
     </div>
     <div class="gantt-grid" id="gantt-grid">
-      <!-- filled by JS -->
+      <!-- filled by JS — desktop view -->
+    </div>
+    <div class="mobile-loc-list" id="mobile-loc-list">
+      <!-- filled by JS — mobile view (hidden on desktop via CSS) -->
     </div>
     <div class="gantt-legend">
       <span class="gantt-legend-item"><span class="g-track-icon main" style="width:8px;height:8px;border-radius:50%;background:var(--accent);"></span>Main track</span>
@@ -2090,6 +2246,403 @@ function renderGantt() {
   }
 
   grid.appendChild(colTime);
+}
+
+/* ============================================================
+   MOBILE LOCATION LIST
+   ============================================================
+   Below 768px, the desktop Gantt is hidden via CSS and this list is shown
+   instead. Each location is a collapsible card with a 40-week overview
+   strip; expanding reveals the runs of campaigns on that location with
+   their date ranges, plus an "Add campaign" button.
+*/
+
+// Track which cards are expanded (UI-only state, not persisted)
+const mobileExpanded = new Set();
+
+function scheduleToRuns(arr) {
+  // Collapse a 40-length array into runs of consecutive same-campaign weeks.
+  // Returns e.g. [{campId:"c1", start:0, end:2}, {campId:"c3", start:5, end:8}]
+  const out = [];
+  let i = 0;
+  while (i < arr.length) {
+    const v = arr[i];
+    if (v == null) { i++; continue; }
+    let j = i;
+    while (j + 1 < arr.length && arr[j+1] === v) j++;
+    out.push({ campId: v, start: i, end: j });
+    i = j + 1;
+  }
+  return out;
+}
+
+function weekLabel(weekIdx) {
+  return MONTHS[Math.floor(weekIdx / 4)] + " W" + ((weekIdx % 4) + 1);
+}
+
+function rangeLabel(start, end) {
+  if (start === end) return weekLabel(start);
+  return weekLabel(start) + " – " + weekLabel(end);
+}
+
+function renderMobileList() {
+  const container = document.getElementById("mobile-loc-list");
+  if (!container) return;
+
+  const filtered = getFilteredLocations();
+  container.innerHTML = "";
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="ml-empty">No locations match the current filters</div>';
+    return;
+  }
+
+  for (const L of filtered) {
+    const card = document.createElement("div");
+    card.className = "ml-card" + (mobileExpanded.has(L.id) ? " expanded" : "");
+
+    const mainPlan = state.schedule[cellKey(L.id, "main")] || [];
+    const ovlPlan  = state.schedule[cellKey(L.id, "overlay")] || [];
+    const mainRuns = scheduleToRuns(mainPlan);
+    const ovlRuns  = L.screen === "Static" ? [] : scheduleToRuns(ovlPlan);
+
+    const cityChips = (L.cities || (L.area ? [L.area] : [])).slice(0, 2)
+      .map(c => '<span class="g-loc-chip">' + escapeHtml(c) + '</span>').join("");
+    const screenClass = (L.screen || "").toLowerCase();
+
+    // Build the 40-week strip — main track colours
+    let stripHtml = '<div class="ml-strip' + (L.screen === "Static" ? " static" : "") + '">';
+    for (let w = 0; w < WEEK_COUNT; w++) {
+      const cid = mainPlan[w];
+      const ovl = ovlPlan[w];
+      const camp = cid ? getCampaignById(cid) : null;
+      const ovlCamp = ovl ? getCampaignById(ovl) : null;
+      // Prefer main colour; if main empty and overlay present, show overlay
+      const shown = camp || ovlCamp;
+      const color = shown ? SLOT_COLORS[shown.slot] : "var(--bg-2)";
+      const isMonthStart = (w % 4 === 0 && w > 0) ? " month-start" : "";
+      stripHtml += '<div class="ml-strip-cell' + isMonthStart + '" style="background:' + color + ';"></div>';
+    }
+    stripHtml += '</div>';
+
+    card.innerHTML =
+      '<div class="ml-card-head" data-loc-id="' + escapeAttr(L.id) + '">' +
+        '<img class="ml-card-photo" src="' + escapeAttr(photoSrc(L)) + '" alt="" loading="lazy">' +
+        '<div class="ml-card-meta">' +
+          '<div class="ml-card-name">' + escapeHtml(L.name) + '</div>' +
+          '<div class="ml-card-chips">' +
+            cityChips +
+            '<span class="g-loc-chip ' + screenClass + '">' + escapeHtml(L.screen) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="ml-card-actions">' +
+          '<button class="ml-card-edit" aria-label="Edit location"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-7 7H4.5v-2l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>' +
+          '<span class="ml-card-chev">›</span>' +
+        '</div>' +
+      '</div>' +
+      stripHtml;
+
+    if (mobileExpanded.has(L.id)) {
+      const body = document.createElement("div");
+      body.className = "ml-card-body";
+
+      // MAIN track
+      body.innerHTML += '<div class="ml-track-label">Main track</div>';
+      if (mainRuns.length === 0) {
+        body.innerHTML += '<div class="ml-empty">No campaigns scheduled on main track</div>';
+      } else {
+        body.innerHTML += mainRuns.map(r => renderRunRow(L.id, "main", r)).join("");
+      }
+      body.innerHTML += '<button class="ml-add" data-add-track="main" data-loc-id="' + escapeAttr(L.id) + '"><span style="font-size:14px;line-height:1;">+</span> Add to main track</button>';
+
+      // OVERLAY track (non-static only)
+      if (L.screen === "Static") {
+        body.innerHTML += '<div class="ml-static-note">Overlay track not available on static hoardings</div>';
+      } else {
+        body.innerHTML += '<div class="ml-track-label overlay">Overlay track</div>';
+        if (ovlRuns.length === 0) {
+          body.innerHTML += '<div class="ml-empty">No campaigns scheduled on overlay</div>';
+        } else {
+          body.innerHTML += ovlRuns.map(r => renderRunRow(L.id, "overlay", r)).join("");
+        }
+        body.innerHTML += '<button class="ml-add" data-add-track="overlay" data-loc-id="' + escapeAttr(L.id) + '"><span style="font-size:14px;line-height:1;">+</span> Add to overlay track</button>';
+      }
+      card.appendChild(body);
+    }
+
+    // Event hooks
+    const head = card.querySelector(".ml-card-head");
+    head.addEventListener("click", (e) => {
+      if (e.target.closest(".ml-card-edit")) return;  // let edit button handle itself
+      if (mobileExpanded.has(L.id)) mobileExpanded.delete(L.id);
+      else mobileExpanded.add(L.id);
+      renderMobileList();
+    });
+    const editBtn = card.querySelector(".ml-card-edit");
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openLocationEditor(L);
+    });
+
+    // Run rows
+    card.querySelectorAll(".ml-run").forEach(row => {
+      row.addEventListener("click", () => {
+        openRangePicker(row.dataset.locId, row.dataset.track, parseInt(row.dataset.start, 10), parseInt(row.dataset.end, 10));
+      });
+    });
+    // Add buttons
+    card.querySelectorAll(".ml-add").forEach(btn => {
+      btn.addEventListener("click", () => {
+        openAddCampaignRange(btn.dataset.locId, btn.dataset.addTrack);
+      });
+    });
+
+    container.appendChild(card);
+  }
+}
+
+function renderRunRow(locId, track, run) {
+  const camp = getCampaignById(run.campId);
+  if (!camp) return "";
+  const color = SLOT_COLORS[camp.slot] || "#666";
+  return '<div class="ml-run" data-loc-id="' + escapeAttr(locId) + '" data-track="' + escapeAttr(track) + '" data-start="' + run.start + '" data-end="' + run.end + '">' +
+    '<span class="ml-run-dot" style="background:' + color + ';"></span>' +
+    '<div class="ml-run-info">' +
+      '<div class="ml-run-name">' + escapeHtml(camp.name) + '</div>' +
+      '<div class="ml-run-range">' + rangeLabel(run.start, run.end) + '</div>' +
+    '</div>' +
+    '<span class="ml-run-chev">›</span>' +
+  '</div>';
+}
+
+/* Open the campaign picker for an existing run — picking a new campaign
+   replaces the whole range; picking "Off-air" clears it. */
+function openRangePicker(locId, track, startWeek, endWeek) {
+  const L = allLocations().find(x => x.id === locId);
+  if (!L) return;
+  const key = cellKey(locId, track);
+  const current = state.schedule[key][startWeek];
+
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) closeModal(); });
+
+  let searchQ = "";
+  const render = () => {
+    const filtered = state.campaigns
+      .slice()
+      .sort((a,b) => (a.order || 999) - (b.order || 999))
+      .filter(c => !searchQ || c.name.toLowerCase().includes(searchQ.toLowerCase()));
+
+    const rowsHtml = filtered.map(c => {
+      const sel = (c.id === current) ? ' <span style="margin-left:auto; color: var(--mint);">✓</span>' : '';
+      return '<button class="picker-row" data-id="' + escapeAttr(c.id) + '">' +
+        '<span class="picker-row-swatch" style="background:' + SLOT_COLORS[c.slot] + ';"></span>' +
+        escapeHtml(c.name) + sel +
+      '</button>';
+    }).join("");
+
+    wrap.innerHTML =
+      '<div class="modal picker-modal">' +
+        '<div class="modal-head">' +
+          '<div>' +
+            '<div class="modal-head-sub">EDIT RUN · ' + rangeLabel(startWeek, endWeek) + '</div>' +
+            '<div class="modal-head-title">' + escapeHtml(L.name) + '</div>' +
+          '</div>' +
+          '<button class="modal-close" id="mx-close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>' +
+        '</div>' +
+        '<div class="modal-search-wrap" style="position: relative;">' +
+          '<input class="modal-search" id="mx-search" dir="ltr" placeholder="Search campaigns…" autocomplete="off" value="' + escapeAttr(searchQ) + '">' +
+        '</div>' +
+        '<div class="picker-body">' +
+          '<button class="picker-row picker-row-off" data-id="__OFF__">' +
+            '<span class="picker-row-swatch" style="background: transparent; border: 1px dashed var(--text-3);"></span>' +
+            'OFF-AIR (remove)' +
+            ((current == null) ? ' <span style="margin-left:auto; color: var(--mint);">✓</span>' : '') +
+          '</button>' +
+          rowsHtml +
+        '</div>' +
+        '<div class="modal-foot">' +
+          '<span style="flex:1;"></span>' +
+          '<button class="btn-secondary" id="mx-cancel">Cancel</button>' +
+        '</div>' +
+      '</div>';
+
+    wrap.querySelector("#mx-close").addEventListener("click", closeModal);
+    wrap.querySelector("#mx-cancel").addEventListener("click", closeModal);
+    const searchEl = wrap.querySelector("#mx-search");
+    const hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+    if (hasFinePointer) searchEl.focus();
+    searchEl.addEventListener("input", (e) => { searchQ = e.target.value; render(); });
+
+    wrap.querySelectorAll(".picker-row").forEach(r => {
+      r.addEventListener("click", () => {
+        const id = r.dataset.id;
+        const newVal = (id === "__OFF__") ? null : id;
+        state.schedule[key] = state.schedule[key].slice();
+        for (let w = startWeek; w <= endWeek; w++) {
+          state.schedule[key][w] = newVal;
+        }
+        saveState();
+        closeModal();
+        rerenderAfterScheduleChange();
+      });
+    });
+  };
+
+  document.getElementById("modal-root").appendChild(wrap);
+  render();
+}
+
+/* Add a new campaign run to a location — pick campaign + start/end week. */
+function openAddCampaignRange(locId, track) {
+  const L = allLocations().find(x => x.id === locId);
+  if (!L) return;
+  if (L.screen === "Static" && track === "overlay") return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) closeModal(); });
+
+  // Defaults: first empty week on this track → +3 weeks (capped)
+  const key = cellKey(locId, track);
+  const sched = state.schedule[key] || Array(WEEK_COUNT).fill(null);
+  let defaultStart = sched.findIndex(v => v == null);
+  if (defaultStart === -1) defaultStart = 0;
+  let defaultEnd = Math.min(defaultStart + 3, WEEK_COUNT - 1);
+  // don't extend into occupied territory
+  for (let w = defaultStart; w <= defaultEnd; w++) {
+    if (sched[w] != null) { defaultEnd = w - 1; break; }
+  }
+  if (defaultEnd < defaultStart) defaultEnd = defaultStart;
+
+  const draft = { campId: null, start: defaultStart, end: defaultEnd };
+  let searchQ = "";
+  let step = "campaign";  // "campaign" or "range"
+
+  const weekOpts = () => {
+    let h = "";
+    for (let w = 0; w < WEEK_COUNT; w++) {
+      h += '<option value="' + w + '">' + weekLabel(w) + '</option>';
+    }
+    return h;
+  };
+
+  const render = () => {
+    const sortedCamps = state.campaigns.slice().sort((a,b) => (a.order || 999) - (b.order || 999));
+    const filteredCamps = sortedCamps.filter(c => !searchQ || c.name.toLowerCase().includes(searchQ.toLowerCase()));
+    const selectedCamp = draft.campId ? getCampaignById(draft.campId) : null;
+
+    let bodyHtml = "";
+    if (step === "campaign") {
+      bodyHtml = '<div class="modal-search-wrap" style="position: relative;">' +
+        '<input class="modal-search" id="ax-search" dir="ltr" placeholder="Search campaigns…" autocomplete="off" value="' + escapeAttr(searchQ) + '">' +
+      '</div>' +
+      '<div class="picker-body">' +
+        filteredCamps.map(c =>
+          '<button class="picker-row" data-id="' + escapeAttr(c.id) + '">' +
+            '<span class="picker-row-swatch" style="background:' + SLOT_COLORS[c.slot] + ';"></span>' +
+            escapeHtml(c.name) +
+          '</button>'
+        ).join("") +
+      '</div>';
+    } else {
+      // Range step
+      bodyHtml = '<div class="modal-body" style="padding: 18px;">' +
+        '<div style="display:flex; align-items:center; gap:10px; padding: 10px 12px; background: var(--bg-2); border-radius: 6px; margin-bottom: 14px;">' +
+          '<span class="ml-run-dot" style="background:' + SLOT_COLORS[selectedCamp.slot] + ';"></span>' +
+          '<div style="font-size: 13px; font-weight: 600;">' + escapeHtml(selectedCamp.name) + '</div>' +
+          '<button id="ax-change" style="margin-left:auto; background:none; border:0; color: var(--accent-2); font-size: 11px; cursor: pointer;">Change</button>' +
+        '</div>' +
+        '<div class="field">' +
+          '<label class="field-label">When does this run?</label>' +
+          '<div class="ml-range-row">' +
+            '<select class="field-input" id="ax-start">' + weekOpts() + '</select>' +
+            '<span class="ml-range-sep">to</span>' +
+            '<select class="field-input" id="ax-end">' + weekOpts() + '</select>' +
+          '</div>' +
+          '<div id="ax-conflict" style="font-size: 10px; color: var(--rose); margin-top: 6px; min-height: 12px;"></div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    wrap.innerHTML =
+      '<div class="modal picker-modal">' +
+        '<div class="modal-head">' +
+          '<div>' +
+            '<div class="modal-head-sub">ADD CAMPAIGN · ' + escapeHtml(track.toUpperCase()) + '</div>' +
+            '<div class="modal-head-title">' + escapeHtml(L.name) + '</div>' +
+          '</div>' +
+          '<button class="modal-close" id="ax-close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>' +
+        '</div>' +
+        bodyHtml +
+        '<div class="modal-foot">' +
+          '<span style="flex:1;"></span>' +
+          '<button class="btn-secondary" id="ax-cancel">Cancel</button>' +
+          (step === "range"
+            ? '<button class="btn-primary" id="ax-apply">Add campaign</button>'
+            : '') +
+        '</div>' +
+      '</div>';
+
+    wrap.querySelector("#ax-close").addEventListener("click", closeModal);
+    wrap.querySelector("#ax-cancel").addEventListener("click", closeModal);
+
+    if (step === "campaign") {
+      const searchEl = wrap.querySelector("#ax-search");
+      const hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+      if (hasFinePointer) searchEl.focus();
+      searchEl.addEventListener("input", (e) => { searchQ = e.target.value; render(); });
+      wrap.querySelectorAll(".picker-row").forEach(r => {
+        r.addEventListener("click", () => {
+          draft.campId = r.dataset.id;
+          step = "range";
+          render();
+        });
+      });
+    } else {
+      const startSel = wrap.querySelector("#ax-start");
+      const endSel = wrap.querySelector("#ax-end");
+      startSel.value = draft.start;
+      endSel.value = draft.end;
+      const updateConflict = () => {
+        const s = parseInt(startSel.value, 10);
+        const e = parseInt(endSel.value, 10);
+        draft.start = s; draft.end = e;
+        const conflictEl = wrap.querySelector("#ax-conflict");
+        if (s > e) { conflictEl.textContent = "End week must be after start week"; return false; }
+        // Check overlap with existing runs on this track
+        const latest = state.schedule[key] || [];
+        for (let w = s; w <= e; w++) {
+          if (latest[w] != null) {
+            conflictEl.textContent = "Conflicts with an existing campaign at " + weekLabel(w);
+            return false;
+          }
+        }
+        conflictEl.textContent = "";
+        return true;
+      };
+      startSel.addEventListener("change", updateConflict);
+      endSel.addEventListener("change", updateConflict);
+      updateConflict();
+
+      wrap.querySelector("#ax-change").addEventListener("click", () => { step = "campaign"; render(); });
+      wrap.querySelector("#ax-apply").addEventListener("click", () => {
+        if (!updateConflict()) { toast("Fix the range conflict first"); return; }
+        state.schedule[key] = state.schedule[key].slice();
+        for (let w = draft.start; w <= draft.end; w++) {
+          state.schedule[key][w] = draft.campId;
+        }
+        saveState();
+        closeModal();
+        rerenderAfterScheduleChange();
+        toast("Campaign added");
+      });
+    }
+  };
+
+  document.getElementById("modal-root").appendChild(wrap);
+  render();
 }
 
 function makeRowCells(location, track, plan, weekW) {
@@ -3064,7 +3617,7 @@ function rerenderAll() {
   renderKPIs();
   renderChart();
   renderDistribution();
-  renderGantt();
+  renderGantt(); renderMobileList();
   renderCampaignTable();
   renderCampaignFilterDropdown();
   renderCityFilterDropdown();
@@ -3073,7 +3626,7 @@ function rerenderCampaignsAndGantt() {
   renderKPIs();
   renderChart();
   renderDistribution();
-  renderGantt();
+  renderGantt(); renderMobileList();
   renderCampaignTable();
   renderCampaignFilterDropdown();
 }
@@ -3081,7 +3634,7 @@ function rerenderAfterScheduleChange() {
   renderKPIs();
   renderChart();
   renderDistribution();
-  renderGantt();
+  renderGantt(); renderMobileList();
   renderCampaignTable();
 }
 
@@ -3107,15 +3660,15 @@ function toast(msg) {
 function bindEvents() {
   document.getElementById("filter-city").addEventListener("change", e => {
     state.filter.city = e.target.value;
-    renderKPIs(); renderGantt();
+    renderKPIs(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-screen").addEventListener("change", e => {
     state.filter.screen = e.target.value;
-    renderKPIs(); renderGantt();
+    renderKPIs(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-campaign").addEventListener("change", e => {
     state.filter.campaign = e.target.value;
-    renderGantt();
+    renderGantt(); renderMobileList();
   });
   document.getElementById("filter-reset").addEventListener("click", () => {
     state.filter = { city: "all", screen: "all", campaign: "all" };
@@ -3153,7 +3706,7 @@ function bindEvents() {
   let rTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(rTimer);
-    rTimer = setTimeout(() => renderGantt(), 160);
+    rTimer = setTimeout(() => { renderGantt(); renderMobileList(); }, 160);
   });
 }
 
