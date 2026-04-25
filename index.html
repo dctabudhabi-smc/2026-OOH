@@ -2337,8 +2337,7 @@ function renderGantt() {
     const row = document.createElement("div");
     row.className = "g-loc";
     const screenClass = L.screen.toLowerCase();
-    const isUserAdded = !!L.user && !isBaseLocationId(L.id);
-    const userTag = isUserAdded ? '<span class="g-loc-user-tag" style="margin-left: 4px;" title="Custom location">Custom</span>' : '';
+    const userTag = '';   // Custom tag retired — visually noisy and not useful
     const cities = L.cities || (L.area ? [L.area] : []);
     const cityChips = cities.slice(0, 2).map(c => '<span class="g-loc-chip">' + escapeHtml(c) + '</span>').join("");
     const extraChip = cities.length > 2 ? '<span class="g-loc-chip" title="' + escapeAttr(cities.slice(2).join(", ")) + '">+' + (cities.length - 2) + '</span>' : '';
