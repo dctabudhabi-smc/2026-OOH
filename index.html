@@ -190,8 +190,11 @@
     .auth-title { font-size: 19px; }
     .auth-logo { height: 42px; }
     .auth-logo img { height: 30px; }
-    .auth-field input { font-size: 13px; padding: 11px 12px; }
-    .auth-submit { padding: 12px 16px; font-size: 13px; }
+    /* font-size MUST be at least 16px on mobile to prevent iOS Safari from
+       auto-zooming the page when an input gets focus. Anything smaller and
+       Safari decides the field is too small to read and pinch-zooms in. */
+    .auth-field input { font-size: 16px; padding: 12px 14px; }
+    .auth-submit { padding: 14px 16px; font-size: 14px; }
   }
 
 
@@ -386,10 +389,29 @@
   .admin-modal {
     max-width: 720px;
     width: calc(100vw - 40px);
+    /* On mobile the modal sits flush against the bottom of the viewport
+       (it inherits .modal's bottom-sheet positioning). To keep the whole
+       sheet visible we cap its height and let .adm-body scroll inside. */
+    max-height: 90vh;
+    display: flex; flex-direction: column;
   }
+  .admin-modal .modal-head { flex-shrink: 0; }
   .adm-body {
     padding: 18px;
-    max-height: 70vh; overflow-y: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1 1 auto;
+    min-height: 0;   /* allow flex child to shrink for overflow */
+  }
+  @media (max-width: 767px) {
+    .admin-modal {
+      width: 100%;
+      max-width: 100%;
+      max-height: 88vh;
+      max-height: 88dvh;   /* dynamic viewport height — accounts for mobile chrome */
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
   }
   .adm-section { margin-bottom: 22px; }
   .adm-section:last-child { margin-bottom: 0; }
@@ -1791,7 +1813,7 @@
 
         <label class="auth-label" for="su-name">Full name</label>
         <div class="auth-field">
-          <input type="text" id="su-name" autocomplete="name" placeholder="George Kalliamvakos" dir="ltr" lang="en">
+          <input type="text" id="su-name" autocomplete="name" placeholder="John Doe" dir="ltr" lang="en">
         </div>
 
         <label class="auth-label" for="su-email">Email</label>
