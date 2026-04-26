@@ -325,8 +325,100 @@
     color: var(--text); cursor: pointer;
     font-family: var(--ff); font-size: 12px;
     transition: background 120ms;
+    position: relative;
   }
   .acct-chip button:hover { background: var(--surf-2); border-color: var(--line-2); }
+  /* Pending-approval badge — small red pill on top-right of avatar */
+  .acct-badge {
+    position: absolute;
+    top: -4px; right: -4px;
+    min-width: 16px; height: 16px;
+    padding: 0 4px;
+    border-radius: 10px;
+    background: var(--rose);
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    box-sizing: border-box;
+    box-shadow: 0 0 0 2px var(--bg);
+    animation: badgePulse 2s ease-in-out infinite;
+  }
+  @keyframes badgePulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 0 rgba(244,63,94,0.5); }
+    50%      { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgba(244,63,94,0); }
+  }
+
+  /* Pending-approval toast banner — top-of-page, stacks if multiple */
+  .pending-toast-stack {
+    position: fixed;
+    top: 18px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 80;
+    display: flex; flex-direction: column;
+    gap: 8px;
+    width: 100%; max-width: 480px;
+    pointer-events: none;
+  }
+  .pending-toast {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 12px 12px 14px;
+    background: var(--surf);
+    border: 1px solid rgba(245,158,11,0.4);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    pointer-events: auto;
+    transform: translateY(-12px); opacity: 0;
+    animation: pendingToastIn 250ms cubic-bezier(0.2, 0.7, 0.1, 1) forwards;
+  }
+  .pending-toast.leaving {
+    animation: pendingToastOut 200ms ease forwards;
+  }
+  @keyframes pendingToastIn  { to { transform: translateY(0); opacity: 1; } }
+  @keyframes pendingToastOut { to { transform: translateY(-12px); opacity: 0; } }
+  .pending-toast-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(245,158,11,0.15);
+    color: var(--amber);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+  }
+  .pending-toast-body { flex: 1; min-width: 0; }
+  .pending-toast-title {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pending-toast-sub {
+    font-size: 11px; color: var(--text-3);
+    margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: var(--ff-mono);
+  }
+  .pending-toast-action {
+    background: var(--accent); color: white;
+    border: 0; border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: var(--ff);
+    flex-shrink: 0;
+  }
+  .pending-toast-action:hover { background: var(--accent-2); }
+  .pending-toast-close {
+    width: 26px; height: 26px;
+    background: transparent;
+    border: 0; border-radius: 6px;
+    color: var(--text-3);
+    display: grid; place-items: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .pending-toast-close:hover { background: var(--surf-2); color: var(--text); }
+  @media (max-width: 600px) {
+    .pending-toast-stack { width: calc(100% - 24px); max-width: 100%; top: 12px; }
+    .pending-toast-action { padding: 6px 10px; font-size: 11px; }
+  }
   .acct-avatar {
     width: 24px; height: 24px; border-radius: 50%;
     background: rgba(167,139,250,0.18);
@@ -1573,27 +1665,29 @@
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     z-index: 50;
-    display: flex; align-items: flex-end; justify-content: center;
+    /* Center the modal vertically on every screen size, with a comfortable
+       gutter on the sides so it doesn't go edge-to-edge on phones. */
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
     opacity: 0;
     animation: fadeIn 160ms ease forwards;
   }
-  @media (min-width: 768px) { .modal-backdrop { align-items: center; } }
   @keyframes fadeIn { to { opacity: 1; } }
 
   .modal {
     width: 100%;
     max-width: 480px;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
     background: var(--surf);
     border: 1px solid var(--line-2);
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
-    overflow: hidden;
+    border-radius: 14px;
     box-shadow: var(--shadow-pop);
-    transform: translateY(30px);
+    transform: translateY(20px);
     opacity: 0;
     animation: slideUp 220ms cubic-bezier(0.2, 0.7, 0.1, 1) forwards;
   }
-  @media (min-width: 768px) { .modal { border-radius: 14px; } }
   @keyframes slideUp { to { transform: none; opacity: 1; } }
 
   .modal-head {
@@ -2726,29 +2820,73 @@ function initFirebase() {
     setSyncStatus("connecting", "Connecting…");
 
     // ---- PLAN SUBSCRIPTION ----
-    fbDb.ref("plan").on("value", (snap) => {
-      const remote = snap.val();
+    // After sign-in, the database WebSocket connection takes a moment to
+    // pick up the freshly-issued auth token. If we subscribe to /plan in
+    // that window we get permission_denied, even though the user is fully
+    // approved. Belt-and-braces fix: subscribe via a wrapper that retries
+    // on permission_denied, and when a successful read finally arrives we
+    // promote the status back to "online" in case it had flipped to error.
+    let planErrCount = 0;
+    let planRetryTimer = null;
 
-      // Empty database — seed with our current state.
-      if (!remote) {
-        writePlanToFirebase();
-        return;
-      }
+    const subscribePlan = () => {
+      // Detach any previous listener (in case we're retrying)
+      try { fbDb.ref("plan").off("value"); } catch (_) {}
 
-      // Ignore our own echo (Firebase echoes writes back to us).
-      const remoteStamp = remote._updatedBy;
-      if (remoteStamp === sessionId && Date.now() - myLastWriteAt < 2500) return;
+      fbDb.ref("plan").on("value", (snap) => {
+        // Whenever data flows successfully, clear any prior "error" status
+        if (planErrCount > 0) {
+          planErrCount = 0;
+          setSyncStatus("online", lastOnlineLabel);
+        }
 
-      applyRemoteSnapshot(remote);
+        const remote = snap.val();
 
-      // Show a subtle toast if this was an external edit
-      if (remoteStamp && remoteStamp !== sessionId && Date.now() - myLastWriteAt > 1000) {
-        toast("Plan updated · changes from another user");
-      }
-    }, (err) => {
-      console.warn("Firebase subscription error", err);
-      setSyncStatus("error", "Sync failed — kept local");
-    });
+        // Empty database — seed with our current state.
+        if (!remote) {
+          writePlanToFirebase();
+          return;
+        }
+
+        // Ignore our own echo (Firebase echoes writes back to us).
+        const remoteStamp = remote._updatedBy;
+        if (remoteStamp === sessionId && Date.now() - myLastWriteAt < 2500) return;
+
+        applyRemoteSnapshot(remote);
+
+        // Show a subtle toast if this was an external edit
+        if (remoteStamp && remoteStamp !== sessionId && Date.now() - myLastWriteAt > 1000) {
+          toast("Plan updated · changes from another user");
+        }
+      }, (err) => {
+        console.warn("Firebase subscription error", err);
+        const isPermDenied = err && /permission_denied/i.test(String(err.code || err.message || err));
+        planErrCount++;
+
+        // Token race: permission_denied right after sign-in usually means
+        // the database connection hasn't picked up the new auth token yet.
+        // Force a fresh token + reconnect, then retry the subscription up
+        // to 4 times (≈ 500ms, 1s, 2s, 4s back-off).
+        if (isPermDenied && planErrCount <= 4 && firebase.auth().currentUser) {
+          setSyncStatus("connecting", "Connecting…");
+          clearTimeout(planRetryTimer);
+          planRetryTimer = setTimeout(async () => {
+            try {
+              // Refresh the auth token, then bounce the database connection
+              // so it re-authenticates on reconnect.
+              await firebase.auth().currentUser.getIdToken(true);
+              firebase.database().goOffline();
+              firebase.database().goOnline();
+            } catch (_) { /* ignore */ }
+            subscribePlan();
+          }, Math.min(500 * Math.pow(2, planErrCount - 1), 4000));
+        } else {
+          setSyncStatus("error", "Sync failed — kept local");
+        }
+      });
+    };
+
+    subscribePlan();
 
     // ---- PRESENCE ----
     presenceRef = fbDb.ref("presence/" + sessionId);
@@ -5256,6 +5394,9 @@ function applyRoleRestrictions() {
 
   // Render the account chip so the user sees who they are + can sign out
   renderAccountChip();
+
+  // Admin-only: start watching for pending signups so we never miss one
+  if (isAdmin()) startPendingApprovalWatcher();
 }
 
 // Header chip showing displayName + role, + admin gear when applicable.
@@ -5274,6 +5415,7 @@ function renderAccountChip() {
         '<span class="acct-avatar" id="acct-avatar"></span>' +
         '<span class="acct-name" id="acct-name"></span>' +
         '<span class="acct-role" id="acct-role"></span>' +
+        '<span class="acct-badge" id="acct-badge" hidden></span>' +
       '</button>';
     tr.appendChild(chip);
     chip.querySelector("#acct-btn").addEventListener("click", openAccountMenu);
@@ -5285,6 +5427,128 @@ function renderAccountChip() {
   const roleEl = document.getElementById("acct-role");
   roleEl.textContent = userRole().toUpperCase();
   roleEl.dataset.role = userRole();
+}
+
+/* ============================================================
+   PENDING APPROVAL WATCHER (admin-only)
+   ============================================================
+   Live-subscribes to /users filtered to status=pending. Two effects:
+   - A persistent red badge with count appears on the account chip when
+     pending > 0. Clicking the chip → User management opens the queue.
+   - A top-of-page toast banner shows ONCE per never-seen pending UID,
+     so the admin gets actively interrupted on a new signup, but a
+     refresh (or returning to the tab later) doesn't re-spam.
+   The toast is suppressed while the admin panel is already open.
+*/
+let pendingWatcherStarted = false;
+let pendingCurrent = {};                 // uid → user record
+const ALERTED_UIDS_KEY = "ooh_alerted_pending_uids";
+
+function loadAlertedUids() {
+  try { return new Set(JSON.parse(localStorage.getItem(ALERTED_UIDS_KEY)) || []); }
+  catch (e) { return new Set(); }
+}
+function saveAlertedUids(set) {
+  try { localStorage.setItem(ALERTED_UIDS_KEY, JSON.stringify([...set])); }
+  catch (e) {}
+}
+
+function startPendingApprovalWatcher() {
+  if (pendingWatcherStarted) return;
+  pendingWatcherStarted = true;
+  if (typeof firebase === "undefined" || !firebase.database) return;
+
+  const ref = firebase.database().ref("users").orderByChild("status").equalTo("pending");
+  ref.on("value", (snap) => {
+    pendingCurrent = snap.val() || {};
+    const uids = Object.keys(pendingCurrent);
+    updatePendingBadge(uids.length);
+
+    // Compute "newly seen" UIDs that we haven't toast-alerted on this device yet.
+    // Also clean up alerted UIDs that are no longer pending (approved/rejected/deleted).
+    const alerted = loadAlertedUids();
+    const stillValid = new Set(uids.filter(uid => alerted.has(uid)));
+    const newOnes = uids.filter(uid => !alerted.has(uid));
+
+    // Remember everyone we've ever alerted who is still pending — drop ones who aren't
+    if (alerted.size !== stillValid.size) saveAlertedUids(stillValid);
+
+    // Don't toast if the admin panel is currently open — they'll see it in the list
+    const adminPanelOpen = document.querySelector(".admin-modal") != null;
+
+    if (newOnes.length > 0 && !adminPanelOpen) {
+      const allSeen = new Set(stillValid); newOnes.forEach(u => allSeen.add(u));
+      saveAlertedUids(allSeen);
+      // Show a single toast covering all unseen pending users
+      const targets = newOnes.map(u => pendingCurrent[u]).filter(Boolean);
+      showPendingToast(targets);
+    }
+  }, (err) => {
+    console.warn("Pending watcher error:", err);
+  });
+}
+
+function updatePendingBadge(count) {
+  const badge = document.getElementById("acct-badge");
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count > 9 ? "9+" : String(count);
+    badge.hidden = false;
+  } else {
+    badge.hidden = true;
+  }
+}
+
+function showPendingToast(targets) {
+  // Build a stacked toast at the top of the page. Auto-dismisses after 8s.
+  // "Review" opens admin panel, "Dismiss" hides without clearing the badge.
+  const container = ensurePendingToastContainer();
+  const card = document.createElement("div");
+  card.className = "pending-toast";
+  const isOne = targets.length === 1;
+  const lead = isOne
+    ? (targets[0].displayName || targets[0].email || "Someone")
+    : (targets.length + " people");
+  const sub = isOne
+    ? (targets[0].email || "")
+    : "have requested access";
+  card.innerHTML =
+    '<div class="pending-toast-icon">' +
+      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>' +
+    '</div>' +
+    '<div class="pending-toast-body">' +
+      '<div class="pending-toast-title">' + escapeHtml(lead) + (isOne ? " requested access" : "") + '</div>' +
+      '<div class="pending-toast-sub">' + escapeHtml(sub) + '</div>' +
+    '</div>' +
+    '<button class="pending-toast-action" type="button">Review</button>' +
+    '<button class="pending-toast-close" type="button" aria-label="Dismiss">' +
+      '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+    '</button>';
+
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return; dismissed = true;
+    card.classList.add("leaving");
+    setTimeout(() => card.remove(), 200);
+  };
+  card.querySelector(".pending-toast-action").addEventListener("click", () => {
+    dismiss();
+    openAdminPanel();
+  });
+  card.querySelector(".pending-toast-close").addEventListener("click", dismiss);
+  container.appendChild(card);
+  setTimeout(dismiss, 8000);
+}
+
+function ensurePendingToastContainer() {
+  let c = document.getElementById("pending-toast-stack");
+  if (!c) {
+    c = document.createElement("div");
+    c.id = "pending-toast-stack";
+    c.className = "pending-toast-stack";
+    document.body.appendChild(c);
+  }
+  return c;
 }
 
 function openAccountMenu() {
