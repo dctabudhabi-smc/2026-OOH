@@ -2820,41 +2820,42 @@ function initFirebase() {
     setSyncStatus("connecting", "Connecting…");
 
     // ---- PLAN SUBSCRIPTION ----
-    // After sign-in, the database WebSocket connection takes a moment to
-    // pick up the freshly-issued auth token. If we subscribe to /plan in
-    // that window we get permission_denied, even though the user is fully
-    // approved. Belt-and-braces fix: subscribe via a wrapper that retries
-    // on permission_denied, and when a successful read finally arrives we
-    // promote the status back to "online" in case it had flipped to error.
+    // Firebase Auth and the Realtime Database connection are separate
+    // pipelines. Right after signInWithEmailAndPassword(), the database
+    // WebSocket may not have received the user's auth token yet, so a
+    // fresh listener gets permission_denied. Workaround: await
+    // getIdToken() first — that ensures the token is loaded into the
+    // database client. Then subscribe normally. If we still get an
+    // error (transient hiccup), retry with simple back-off.
     let planErrCount = 0;
     let planRetryTimer = null;
 
-    const subscribePlan = () => {
-      // Detach any previous listener (in case we're retrying)
+    const subscribePlan = async () => {
       try { fbDb.ref("plan").off("value"); } catch (_) {}
+      // Wait for token to be loaded into the database client.
+      // This is the actual fix — without this, listeners attached
+      // immediately after sign-in race against the auth handshake.
+      try {
+        if (firebase.auth().currentUser) {
+          await firebase.auth().currentUser.getIdToken();
+        }
+      } catch (_) { /* token fetch failed — listener will fail next, we'll retry */ }
 
       fbDb.ref("plan").on("value", (snap) => {
-        // Whenever data flows successfully, clear any prior "error" status
+        // Successful read — clear any prior error state
         if (planErrCount > 0) {
           planErrCount = 0;
           setSyncStatus("online", lastOnlineLabel);
         }
 
         const remote = snap.val();
+        if (!remote) { writePlanToFirebase(); return; }
 
-        // Empty database — seed with our current state.
-        if (!remote) {
-          writePlanToFirebase();
-          return;
-        }
-
-        // Ignore our own echo (Firebase echoes writes back to us).
         const remoteStamp = remote._updatedBy;
         if (remoteStamp === sessionId && Date.now() - myLastWriteAt < 2500) return;
 
         applyRemoteSnapshot(remote);
 
-        // Show a subtle toast if this was an external edit
         if (remoteStamp && remoteStamp !== sessionId && Date.now() - myLastWriteAt > 1000) {
           toast("Plan updated · changes from another user");
         }
@@ -2863,23 +2864,14 @@ function initFirebase() {
         const isPermDenied = err && /permission_denied/i.test(String(err.code || err.message || err));
         planErrCount++;
 
-        // Token race: permission_denied right after sign-in usually means
-        // the database connection hasn't picked up the new auth token yet.
-        // Force a fresh token + reconnect, then retry the subscription up
-        // to 4 times (≈ 500ms, 1s, 2s, 4s back-off).
-        if (isPermDenied && planErrCount <= 4 && firebase.auth().currentUser) {
+        // Retry up to 5 times with linear backoff.
+        // Don't bounce the database connection — that breaks more than it fixes.
+        if (isPermDenied && planErrCount <= 5 && firebase.auth().currentUser) {
           setSyncStatus("connecting", "Connecting…");
           clearTimeout(planRetryTimer);
-          planRetryTimer = setTimeout(async () => {
-            try {
-              // Refresh the auth token, then bounce the database connection
-              // so it re-authenticates on reconnect.
-              await firebase.auth().currentUser.getIdToken(true);
-              firebase.database().goOffline();
-              firebase.database().goOnline();
-            } catch (_) { /* ignore */ }
-            subscribePlan();
-          }, Math.min(500 * Math.pow(2, planErrCount - 1), 4000));
+          // 400ms, 800ms, 1.6s, 3.2s, 5s — cumulative ~11s of patience
+          const delay = Math.min(400 * Math.pow(2, planErrCount - 1), 5000);
+          planRetryTimer = setTimeout(subscribePlan, delay);
         } else {
           setSyncStatus("error", "Sync failed — kept local");
         }
@@ -5458,34 +5450,55 @@ function startPendingApprovalWatcher() {
   pendingWatcherStarted = true;
   if (typeof firebase === "undefined" || !firebase.database) return;
 
-  const ref = firebase.database().ref("users").orderByChild("status").equalTo("pending");
-  ref.on("value", (snap) => {
-    pendingCurrent = snap.val() || {};
-    const uids = Object.keys(pendingCurrent);
-    updatePendingBadge(uids.length);
+  // Same auth race as the plan listener: ensure the database has the
+  // user's auth token before subscribing, then retry with back-off if the
+  // first attempt still hits permission_denied.
+  let pendErrCount = 0;
+  let pendRetryTimer = null;
 
-    // Compute "newly seen" UIDs that we haven't toast-alerted on this device yet.
-    // Also clean up alerted UIDs that are no longer pending (approved/rejected/deleted).
-    const alerted = loadAlertedUids();
-    const stillValid = new Set(uids.filter(uid => alerted.has(uid)));
-    const newOnes = uids.filter(uid => !alerted.has(uid));
+  const subscribePending = async () => {
+    const ref = firebase.database().ref("users").orderByChild("status").equalTo("pending");
+    try { ref.off("value"); } catch (_) {}
+    try {
+      if (firebase.auth().currentUser) {
+        await firebase.auth().currentUser.getIdToken();
+      }
+    } catch (_) { /* will retry below if listener fails */ }
 
-    // Remember everyone we've ever alerted who is still pending — drop ones who aren't
-    if (alerted.size !== stillValid.size) saveAlertedUids(stillValid);
+    ref.on("value", (snap) => {
+      pendErrCount = 0;
+      pendingCurrent = snap.val() || {};
+      const uids = Object.keys(pendingCurrent);
+      updatePendingBadge(uids.length);
 
-    // Don't toast if the admin panel is currently open — they'll see it in the list
-    const adminPanelOpen = document.querySelector(".admin-modal") != null;
+      const alerted = loadAlertedUids();
+      const stillValid = new Set(uids.filter(uid => alerted.has(uid)));
+      const newOnes = uids.filter(uid => !alerted.has(uid));
 
-    if (newOnes.length > 0 && !adminPanelOpen) {
-      const allSeen = new Set(stillValid); newOnes.forEach(u => allSeen.add(u));
-      saveAlertedUids(allSeen);
-      // Show a single toast covering all unseen pending users
-      const targets = newOnes.map(u => pendingCurrent[u]).filter(Boolean);
-      showPendingToast(targets);
-    }
-  }, (err) => {
-    console.warn("Pending watcher error:", err);
-  });
+      if (alerted.size !== stillValid.size) saveAlertedUids(stillValid);
+
+      const adminPanelOpen = document.querySelector(".admin-modal") != null;
+      if (newOnes.length > 0 && !adminPanelOpen) {
+        const allSeen = new Set(stillValid); newOnes.forEach(u => allSeen.add(u));
+        saveAlertedUids(allSeen);
+        const targets = newOnes.map(u => pendingCurrent[u]).filter(Boolean);
+        showPendingToast(targets);
+      }
+    }, (err) => {
+      console.warn("Pending watcher error:", err);
+      const isPermDenied = err && /permission_denied/i.test(String(err.code || err.message || err));
+      pendErrCount++;
+      if (isPermDenied && pendErrCount <= 5 && firebase.auth().currentUser) {
+        clearTimeout(pendRetryTimer);
+        const delay = Math.min(400 * Math.pow(2, pendErrCount - 1), 5000);
+        pendRetryTimer = setTimeout(subscribePending, delay);
+      }
+      // No status pill update here — the pending watcher is admin-only,
+      // and the plan listener handles the visible "sync" UI.
+    });
+  };
+
+  subscribePending();
 }
 
 function updatePendingBadge(count) {
