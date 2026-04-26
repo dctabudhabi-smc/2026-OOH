@@ -25,9 +25,176 @@
 <!-- Firebase Realtime Database (compat SDK for single-file use) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <!-- PptxGenJS — client-side PowerPoint generation for the Export feature -->
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 <style>
+  /* =========================================
+     AUTH SCREENS — login / signup / pending
+     Dark, glassy, centred card on a soft radial gradient backdrop.
+     Mobile-responsive: scales from 380px phones to wide desktops.
+     ========================================= */
+  .auth-shell {
+    position: fixed; inset: 0; z-index: 999;
+    overflow-y: auto;
+    font-family: var(--ff, system-ui, sans-serif);
+  }
+  .auth-bg {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(139,92,246,0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(52,211,153,0.06) 0%, transparent 50%),
+      #050810;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px 20px;
+  }
+  .auth-card {
+    width: 100%; max-width: 420px;
+    background: rgba(20,26,37,0.65);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(167,139,250,0.18);
+    border-radius: 18px;
+    padding: 36px 32px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .auth-logo {
+    display: flex; align-items: center; justify-content: center;
+    height: 52px; margin-bottom: 22px;
+  }
+  .auth-logo img {
+    height: 36px; width: auto;
+    /* Brand white logo on dark bg */
+    opacity: 0.95;
+  }
+  .auth-title {
+    font-size: 22px; font-weight: 600;
+    text-align: center; margin: 0 0 6px;
+    color: #E2E8F0; letter-spacing: -0.01em;
+  }
+  .auth-sub {
+    text-align: center; font-size: 11px; color: #5F6A7E;
+    margin: 0 0 26px; letter-spacing: 0.14em;
+  }
+  .auth-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(167,139,250,0.25), transparent);
+    margin: 0 0 24px;
+  }
+  .auth-label {
+    display: block; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: #5F6A7E; margin-bottom: 8px;
+  }
+  .auth-field {
+    position: relative; margin-bottom: 18px;
+  }
+  .auth-field input {
+    width: 100%;
+    background: rgba(13,17,25,0.7);
+    border: 1px solid #2A3447;
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: #E2E8F0; font-size: 14px;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color 120ms;
+    direction: ltr !important;
+    text-align: left !important;
+  }
+  .auth-field input::placeholder { color: #5F6A7E; }
+  .auth-field input:focus { outline: none; border-color: #8B5CF6; }
+  .auth-eye {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: 0; color: #5F6A7E; cursor: pointer;
+    padding: 6px; display: grid; place-items: center;
+  }
+  .auth-eye:hover { color: #9AA5B8; }
+  .auth-hint {
+    font-size: 11px; color: #5F6A7E;
+    margin: -8px 0 18px; line-height: 1.55;
+  }
+  .auth-forgot {
+    font-size: 11px; color: #A78BFA;
+    text-align: right; display: block; margin-bottom: 18px;
+    cursor: pointer; text-decoration: none;
+  }
+  .auth-forgot:hover { color: #8B5CF6; text-decoration: underline; }
+  .auth-submit {
+    width: 100%;
+    background: #8B5CF6; color: white;
+    border: 0; padding: 13px 18px;
+    font-size: 14px; font-weight: 600;
+    border-radius: 10px; cursor: pointer;
+    font-family: inherit;
+    transition: background 120ms, transform 60ms;
+  }
+  .auth-submit:hover:not(:disabled) { background: #A78BFA; }
+  .auth-submit:active:not(:disabled) { transform: scale(0.985); }
+  .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .auth-alt {
+    text-align: center; font-size: 12px;
+    margin: 22px 0 0; color: #9AA5B8;
+  }
+  .auth-alt a { color: #A78BFA; cursor: pointer; }
+  .auth-alt a:hover { color: #8B5CF6; text-decoration: underline; }
+  .auth-msg {
+    font-size: 12px; min-height: 14px; margin: -4px 0 14px;
+    color: #F43F5E;
+    line-height: 1.4;
+  }
+  .auth-msg.success { color: #34D399; }
+  .auth-msg.info    { color: #A78BFA; }
+  .auth-foot {
+    text-align: center; font-size: 10px;
+    color: #5F6A7E; letter-spacing: 0.15em;
+    padding: 22px 0 0; text-transform: uppercase;
+  }
+
+  /* Pending state */
+  .auth-pending-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(245,158,11,0.15); color: #F59E0B;
+    display: grid; place-items: center;
+    margin: 0 auto 18px;
+  }
+  .auth-pending-icon.rejected {
+    background: rgba(244,63,94,0.15); color: #F43F5E;
+  }
+  .auth-pending-msg {
+    font-size: 13px; color: #9AA5B8;
+    text-align: center; line-height: 1.6;
+    margin: 0 0 16px;
+  }
+  .auth-pending-email {
+    font-size: 11px; color: #5F6A7E;
+    text-align: center;
+    background: rgba(13,17,25,0.5);
+    padding: 10px;
+    border-radius: 8px;
+    margin: 0 0 22px;
+    font-family: var(--ff-mono, monospace);
+    word-break: break-all;
+  }
+  .auth-pending-signout {
+    color: #A78BFA; font-size: 12px;
+    text-align: center; cursor: pointer;
+    display: block;
+  }
+  .auth-pending-signout:hover { color: #8B5CF6; text-decoration: underline; }
+
+  /* Mobile tweaks */
+  @media (max-width: 480px) {
+    .auth-card { padding: 28px 22px; border-radius: 16px; }
+    .auth-title { font-size: 19px; }
+    .auth-logo { height: 42px; }
+    .auth-logo img { height: 30px; }
+    .auth-field input { font-size: 13px; padding: 11px 12px; }
+    .auth-submit { padding: 12px 16px; font-size: 13px; }
+  }
+
+
   /* =========================================
      DCT SM&C Dashboard Style System
      ========================================= */
@@ -143,6 +310,187 @@
   .top-title { font-size: 18px; font-weight: 600; color: var(--text); line-height: 1.2; letter-spacing: -0.01em; }
   .top-sub { font-size: 12px; color: var(--text-2); margin-top: 2px; }
   .top-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+
+  /* ===== Account chip (header) + Account menu modal ===== */
+  .acct-chip { display: flex; align-items: center; }
+  .acct-chip button {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px 5px 5px;
+    background: var(--surf);
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    color: var(--text); cursor: pointer;
+    font-family: var(--ff); font-size: 12px;
+    transition: background 120ms;
+  }
+  .acct-chip button:hover { background: var(--surf-2); border-color: var(--line-2); }
+  .acct-avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(167,139,250,0.18);
+    color: var(--accent-2);
+    display: grid; place-items: center;
+    font-size: 10px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .acct-name {
+    font-size: 12px; font-weight: 500;
+    max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .acct-role {
+    font-size: 9px; padding: 2px 6px;
+    border-radius: 4px; font-weight: 600; letter-spacing: 0.06em;
+    background: var(--surf-2); color: var(--text-2);
+    border: 1px solid var(--line);
+  }
+  .acct-role[data-role="admin"] {
+    color: var(--mint); border-color: rgba(52,211,153,0.35); background: rgba(52,211,153,0.06);
+  }
+  .acct-role[data-role="edit"] {
+    color: var(--accent-2); border-color: rgba(167,139,250,0.35); background: rgba(167,139,250,0.06);
+  }
+  @media (max-width: 640px) {
+    .acct-name { display: none; }
+    .acct-chip button { padding: 4px 8px 4px 4px; }
+  }
+
+  .acct-menu-item {
+    width: 100%; text-align: left;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: transparent; color: var(--text);
+    border: 0; border-radius: 8px;
+    font-size: 13px; font-family: var(--ff);
+    cursor: pointer; margin-bottom: 4px;
+  }
+  .acct-menu-item:hover { background: var(--surf-2); }
+  .acct-menu-item:last-child { margin-bottom: 0; }
+
+  /* ===== Role-based UI restrictions =====
+     View-only users: hide every editing affordance. The server-side
+     security rules also reject any write attempt, so this is purely UX. */
+  .role-view #add-location,
+  .role-view #add-campaign,
+  .role-view #export-ppt,
+  .role-view .g-loc-edit,
+  .role-view .ml-card-edit,
+  .role-view .ml-add,
+  .role-view .camp-row-actions,
+  .role-view .tbl-col-actions,
+  .role-view #camp-tbody td:last-child {
+    display: none !important;
+  }
+  .role-view .g-cell { cursor: default; pointer-events: none; }
+  .role-view .ml-run { pointer-events: none; }
+
+  /* ===== Admin panel modal ===== */
+  .admin-modal {
+    max-width: 720px;
+    width: calc(100vw - 40px);
+  }
+  .adm-body {
+    padding: 18px;
+    max-height: 70vh; overflow-y: auto;
+  }
+  .adm-section { margin-bottom: 22px; }
+  .adm-section:last-child { margin-bottom: 0; }
+  .adm-section-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .adm-section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+    color: var(--text-3); text-transform: uppercase;
+  }
+  .adm-section-count {
+    font-size: 10px; padding: 2px 8px;
+    background: rgba(245,158,11,0.15); color: var(--amber);
+    border-radius: 10px; font-weight: 500;
+  }
+  .adm-card {
+    background: var(--surf);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .adm-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .adm-row:last-child { border-bottom: 0; }
+  .adm-row:hover { background: var(--surf-2); }
+  .adm-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(167,139,250,0.18);
+    color: var(--accent-2);
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 600;
+    flex-shrink: 0;
+  }
+  .adm-avatar.me { background: rgba(52,211,153,0.18); color: var(--mint); }
+  .adm-info { flex: 1; min-width: 0; }
+  .adm-name {
+    font-size: 13px; font-weight: 500; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .adm-email {
+    font-size: 11px; color: var(--text-3);
+    font-family: var(--ff-mono);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .adm-meta {
+    font-size: 10px; color: var(--text-3);
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .adm-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+  .adm-approve, .adm-reject, .adm-disable, .adm-restore {
+    font-size: 11px; padding: 5px 10px;
+    border-radius: 6px; font-weight: 500;
+    border: 1px solid; cursor: pointer; font-family: var(--ff);
+  }
+  .adm-approve {
+    background: rgba(52,211,153,0.12); color: var(--mint);
+    border-color: rgba(52,211,153,0.4);
+  }
+  .adm-approve:hover { background: rgba(52,211,153,0.22); }
+  .adm-reject {
+    background: transparent; color: var(--rose);
+    border-color: rgba(244,63,94,0.4);
+  }
+  .adm-reject:hover { background: rgba(244,63,94,0.12); }
+  .adm-disable {
+    background: transparent; color: var(--text-3);
+    border-color: var(--line-2);
+    width: 26px; height: 26px; padding: 0;
+    font-size: 14px; line-height: 1;
+  }
+  .adm-disable:hover { color: var(--rose); border-color: rgba(244,63,94,0.4); }
+  .adm-restore {
+    background: rgba(139,92,246,0.12); color: var(--accent-2);
+    border-color: rgba(139,92,246,0.4);
+  }
+  .adm-role {
+    background: var(--bg-2);
+    border: 1px solid var(--line-2);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 11px; font-weight: 600;
+    padding: 5px 8px;
+    cursor: pointer;
+    font-family: var(--ff);
+  }
+  .adm-role:disabled { opacity: 0.5; cursor: not-allowed; }
+  .adm-empty {
+    padding: 22px 14px; text-align: center;
+    color: var(--text-3); font-size: 12px;
+  }
+  @media (max-width: 600px) {
+    .adm-row { flex-wrap: wrap; }
+    .adm-meta { width: 100%; padding-left: 44px; margin-top: 2px; }
+    .adm-actions { width: 100%; padding-left: 44px; margin-top: 6px; }
+  }
+
   .live-pill {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 11px; color: var(--text-2);
@@ -1396,6 +1744,94 @@
 </head>
 <body>
 
+<!-- ====== AUTH SHELL (login / signup / pending) ======
+     Visible until Firebase Auth resolves. The dashboard #app-shell stays
+     hidden until the user is authenticated AND approved. -->
+<div id="auth-shell" class="auth-shell" hidden>
+  <div class="auth-bg">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <img id="auth-logo-img" alt="Experience Abu Dhabi">
+      </div>
+
+      <!-- Three swappable forms — JS toggles their visibility -->
+      <!-- LOGIN -->
+      <div class="auth-form" id="auth-login">
+        <h1 class="auth-title">2026 OOH Annual Plan</h1>
+        <p class="auth-sub">DCT ABU DHABI · SM&amp;C</p>
+        <div class="auth-divider"></div>
+
+        <label class="auth-label" for="li-email">Email</label>
+        <div class="auth-field">
+          <input type="email" id="li-email" autocomplete="email"
+                 placeholder="name@dctabudhabi.ae" dir="ltr" lang="en">
+        </div>
+
+        <label class="auth-label" for="li-pass">Password</label>
+        <div class="auth-field">
+          <input type="password" id="li-pass" autocomplete="current-password"
+                 placeholder="Your password" dir="ltr" lang="en">
+          <button type="button" class="auth-eye" id="li-toggle" aria-label="Toggle password visibility">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+
+        <div class="auth-msg" id="li-msg" role="alert"></div>
+
+        <a class="auth-forgot" id="li-forgot">Forgot password?</a>
+        <button class="auth-submit" id="li-submit">Sign in</button>
+        <p class="auth-alt">Don't have an account? <a id="to-signup">Request access</a></p>
+      </div>
+
+      <!-- SIGNUP -->
+      <div class="auth-form" id="auth-signup" hidden>
+        <h1 class="auth-title">Request access</h1>
+        <p class="auth-sub">SUBMIT FOR ADMIN APPROVAL</p>
+        <div class="auth-divider"></div>
+
+        <label class="auth-label" for="su-name">Full name</label>
+        <div class="auth-field">
+          <input type="text" id="su-name" autocomplete="name" placeholder="George Kalliamvakos" dir="ltr" lang="en">
+        </div>
+
+        <label class="auth-label" for="su-email">Email</label>
+        <div class="auth-field">
+          <input type="email" id="su-email" autocomplete="email" placeholder="name@dctabudhabi.ae" dir="ltr" lang="en">
+        </div>
+
+        <label class="auth-label" for="su-pass">Password</label>
+        <div class="auth-field">
+          <input type="password" id="su-pass" autocomplete="new-password" placeholder="At least 8 characters" dir="ltr" lang="en">
+        </div>
+        <p class="auth-hint">Your account will be reviewed by an admin before access is granted. You'll receive an email when approved.</p>
+
+        <div class="auth-msg" id="su-msg" role="alert"></div>
+
+        <button class="auth-submit" id="su-submit">Submit request</button>
+        <p class="auth-alt">Already have an account? <a id="to-login">Sign in</a></p>
+      </div>
+
+      <!-- PENDING / REJECTED HOLDING SCREEN -->
+      <div class="auth-form" id="auth-pending" hidden>
+        <div class="auth-pending-icon" id="pen-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <h1 class="auth-title" id="pen-title">Awaiting approval</h1>
+        <p class="auth-sub" id="pen-sub">PENDING ADMIN REVIEW</p>
+        <div class="auth-divider"></div>
+        <p class="auth-pending-msg" id="pen-msg">Your access request has been received and is awaiting admin approval. You'll receive an email when your account is activated.</p>
+        <div class="auth-pending-email" id="pen-email"></div>
+        <a class="auth-pending-signout" id="pen-signout">Sign out</a>
+      </div>
+    </div>
+
+    <div class="auth-foot">DCT Abu Dhabi · SM&amp;C</div>
+  </div>
+</div>
+
+<!-- ====== APP SHELL (dashboard) ======
+     Hidden until auth resolves AND user is approved. -->
+<div id="app-shell" hidden>
 <div class="wrap">
   <!-- ======== HEADER ======== -->
   <header class="top fade-up">
@@ -1575,11 +2011,259 @@
 
 <div id="modal-root"></div>
 <div id="toast" class="toast"></div>
+</div><!-- /#app-shell -->
 
 <script>
 /* ============================================================
-   DATA
-   ============================================================ */
+   AUTH MODULE
+   ============================================================
+   - Mounts before the rest of the dashboard wakes up.
+   - Decides whether to show the login screen, the pending screen,
+     or the dashboard, based on Firebase Auth state + the user's
+     /users/{uid} record.
+   - Once a user is authenticated AND approved, calls bootstrapApp()
+     which kicks off the existing init() flow.
+*/
+
+// Tracked across the auth lifecycle so we can read it later.
+let authUser = null;            // firebase.User | null
+let authProfile = null;         // { role, status, displayName, ... } | null
+let appBooted = false;          // bootstrapApp() ran once
+
+// Map raw Firebase error codes to friendly messages
+const AUTH_ERR = {
+  "auth/invalid-email": "That email address looks invalid.",
+  "auth/user-disabled": "This account has been disabled. Contact an admin.",
+  "auth/user-not-found": "No account found with that email.",
+  "auth/wrong-password": "Incorrect password.",
+  "auth/invalid-credential": "Email or password is incorrect.",
+  "auth/email-already-in-use": "An account with that email already exists.",
+  "auth/weak-password": "Password must be at least 8 characters.",
+  "auth/network-request-failed": "Network error — check your connection.",
+  "auth/too-many-requests": "Too many attempts. Try again in a few minutes.",
+};
+function authErrText(e) {
+  return AUTH_ERR[e && e.code] || (e && e.message) || "Something went wrong. Try again.";
+}
+
+// Show one of the auth panes; hide the others.
+function showAuthPane(name) {
+  ["auth-login", "auth-signup", "auth-pending"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = (id !== "auth-" + name);
+  });
+  // Clear inline error messages on switch
+  ["li-msg", "su-msg"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = ""; el.className = "auth-msg"; }
+  });
+}
+
+function showAuthShell() {
+  document.getElementById("auth-shell").hidden = false;
+  document.getElementById("app-shell").hidden = true;
+}
+function showAppShell() {
+  document.getElementById("auth-shell").hidden = true;
+  document.getElementById("app-shell").hidden = false;
+}
+
+// Wire up the login form, signup form, pending screen, and form switch links
+function wireAuthForms() {
+  // Logo — reuse the white PPT logo we already have embedded
+  const logoImg = document.getElementById("auth-logo-img");
+  if (logoImg && typeof PPT_LOGO !== "undefined") {
+    logoImg.src = PPT_LOGO;
+  }
+
+  // Switch login ↔ signup
+  document.getElementById("to-signup").addEventListener("click", () => showAuthPane("signup"));
+  document.getElementById("to-login").addEventListener("click", () => showAuthPane("login"));
+
+  // Show/hide password
+  document.getElementById("li-toggle").addEventListener("click", () => {
+    const inp = document.getElementById("li-pass");
+    inp.type = inp.type === "password" ? "text" : "password";
+  });
+
+  // Login submit
+  document.getElementById("li-submit").addEventListener("click", doLogin);
+  document.getElementById("li-pass").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+  document.getElementById("li-email").addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+
+  // Signup submit
+  document.getElementById("su-submit").addEventListener("click", doSignup);
+  document.getElementById("su-pass").addEventListener("keydown", e => { if (e.key === "Enter") doSignup(); });
+
+  // Forgot password
+  document.getElementById("li-forgot").addEventListener("click", doForgot);
+
+  // Pending screen sign out
+  document.getElementById("pen-signout").addEventListener("click", () => firebase.auth().signOut());
+}
+
+async function doLogin() {
+  const email = document.getElementById("li-email").value.trim();
+  const pass  = document.getElementById("li-pass").value;
+  const msgEl = document.getElementById("li-msg");
+  const btn   = document.getElementById("li-submit");
+  msgEl.textContent = ""; msgEl.className = "auth-msg";
+
+  if (!email || !pass) { msgEl.textContent = "Enter your email and password."; return; }
+
+  btn.disabled = true; btn.textContent = "Signing in…";
+  try {
+    await firebase.auth().signInWithEmailAndPassword(email, pass);
+    // onAuthStateChanged will pick it up and route the user
+  } catch (e) {
+    msgEl.textContent = authErrText(e);
+    btn.disabled = false; btn.textContent = "Sign in";
+  }
+}
+
+async function doSignup() {
+  const name  = document.getElementById("su-name").value.trim();
+  const email = document.getElementById("su-email").value.trim();
+  const pass  = document.getElementById("su-pass").value;
+  const msgEl = document.getElementById("su-msg");
+  const btn   = document.getElementById("su-submit");
+  msgEl.textContent = ""; msgEl.className = "auth-msg";
+
+  if (!name)              { msgEl.textContent = "Please enter your full name."; return; }
+  if (!email || !pass)    { msgEl.textContent = "Enter your email and a password."; return; }
+  if (pass.length < 8)    { msgEl.textContent = "Password must be at least 8 characters."; return; }
+
+  btn.disabled = true; btn.textContent = "Submitting…";
+  try {
+    const cred = await firebase.auth().createUserWithEmailAndPassword(email, pass);
+    // Set their displayName on the auth profile
+    await cred.user.updateProfile({ displayName: name });
+    // Write their /users/{uid} record with default pending state.
+    // Bootstrap exception: if the email matches a known admin email AND
+    // there are zero users in the database yet, we'd auto-promote — but
+    // we've decided to seed the admin manually instead, so this stays simple.
+    await firebase.database().ref("users/" + cred.user.uid).set({
+      email: email,
+      displayName: name,
+      role: "view",
+      status: "pending",
+      requestedAt: firebase.database.ServerValue.TIMESTAMP,
+    });
+    // onAuthStateChanged will route them to the pending screen
+  } catch (e) {
+    msgEl.textContent = authErrText(e);
+    btn.disabled = false; btn.textContent = "Submit request";
+  }
+}
+
+async function doForgot() {
+  const email = document.getElementById("li-email").value.trim();
+  const msgEl = document.getElementById("li-msg");
+  if (!email) {
+    msgEl.textContent = "Enter your email above first, then tap 'Forgot password?'";
+    return;
+  }
+  try {
+    await firebase.auth().sendPasswordResetEmail(email);
+    msgEl.className = "auth-msg success";
+    msgEl.textContent = "Password reset email sent. Check your inbox.";
+  } catch (e) {
+    msgEl.className = "auth-msg";
+    msgEl.textContent = authErrText(e);
+  }
+}
+
+// React to auth state changes. Called on initial page load (after Firebase
+// resolves whether there's a persisted session) and on every login/logout.
+async function onAuthChange(user) {
+  if (!user) {
+    authUser = null; authProfile = null;
+    showAuthShell();
+    showAuthPane("login");
+    // Reset the login button if we got here from a failed login
+    const btn = document.getElementById("li-submit");
+    if (btn) { btn.disabled = false; btn.textContent = "Sign in"; }
+    return;
+  }
+  authUser = user;
+  // Fetch the user's profile from /users/{uid}
+  let profile = null;
+  try {
+    const snap = await firebase.database().ref("users/" + user.uid).once("value");
+    profile = snap.val();
+  } catch (e) {
+    console.warn("Failed to fetch user profile:", e);
+  }
+  // If no record exists yet (admin seeded the auth user but not the DB record),
+  // create one as pending. Same fallback for users seeded outside our signup flow.
+  if (!profile) {
+    try {
+      profile = {
+        email: user.email,
+        displayName: user.displayName || user.email,
+        role: "view",
+        status: "pending",
+        requestedAt: firebase.database.ServerValue.TIMESTAMP,
+      };
+      await firebase.database().ref("users/" + user.uid).set(profile);
+    } catch (e) {
+      console.warn("Failed to create user record:", e);
+    }
+  }
+  authProfile = profile;
+
+  // Route based on status
+  if (profile && profile.status === "approved") {
+    showAppShell();
+    if (!appBooted) {
+      appBooted = true;
+      bootstrapApp();
+    }
+    // Mirror lastSeen for admin presence display
+    firebase.database().ref("users/" + user.uid + "/lastSeen").set(firebase.database.ServerValue.TIMESTAMP).catch(() => {});
+  } else if (profile && profile.status === "rejected") {
+    document.getElementById("pen-icon").classList.add("rejected");
+    document.getElementById("pen-title").textContent = "Access declined";
+    document.getElementById("pen-sub").textContent = "ACCOUNT NOT APPROVED";
+    document.getElementById("pen-msg").textContent = "An admin has declined your access request. If this seems wrong, contact your team lead.";
+    document.getElementById("pen-email").textContent = user.email || "";
+    showAuthShell();
+    showAuthPane("pending");
+  } else {
+    // pending or unknown
+    document.getElementById("pen-icon").classList.remove("rejected");
+    document.getElementById("pen-title").textContent = "Awaiting approval";
+    document.getElementById("pen-sub").textContent = "PENDING ADMIN REVIEW";
+    document.getElementById("pen-msg").textContent = "Your access request has been received and is awaiting admin approval. You'll receive an email when your account is activated.";
+    document.getElementById("pen-email").textContent = user.email || "";
+    showAuthShell();
+    showAuthPane("pending");
+  }
+}
+
+// Called from DOMContentLoaded BEFORE the rest of the dashboard kicks in.
+// Initialises Firebase and starts the auth state listener. Once the listener
+// fires with an approved user, bootstrapApp() runs and the dashboard appears.
+function initAuth() {
+  wireAuthForms();
+  if (typeof firebase === "undefined") {
+    // Firebase didn't load (offline or CDN blocked). Show login but warn.
+    showAuthShell(); showAuthPane("login");
+    const msg = document.getElementById("li-msg");
+    if (msg) msg.textContent = "Authentication service unavailable. Check your connection and reload.";
+    return;
+  }
+  try {
+    firebase.initializeApp(FB_CONFIG);
+  } catch (e) {
+    // initializeApp throws if called twice — fine, ignore
+    if (!/already exists/i.test(String(e))) console.warn("Firebase init:", e);
+  }
+  // Start listening
+  firebase.auth().onAuthStateChanged(onAuthChange);
+}
+
+
 const SLOT_COLORS = [
   // 0-9 — primary set
   "#A78BFA","#F472B6","#34D399","#FBBF24","#60A5FA",
@@ -1773,7 +2457,14 @@ function saveState() {
 // Enable verbose console logging with ?debug=1 in the URL
 const DEBUG = (typeof location !== "undefined") && /[?&]debug=1\b/.test(location.search);
 
+// Firebase config — Authentication needs apiKey and authDomain in addition
+// to the database URL. The apiKey and authDomain values come from the Firebase
+// console (Project settings → General → Your apps → Web SDK config). They are
+// public values, safe to commit — security comes from the database rules and
+// auth domain whitelist, NOT from hiding the apiKey.
 const FB_CONFIG = {
+  apiKey:      "AIzaSyDCkFdWXnrIp4X2vcoLwv4QKkh0gv-K3Q0",
+  authDomain:  "ooh-bcf22.firebaseapp.com",
   databaseURL: "https://ooh-bcf22-default-rtdb.firebaseio.com/",
   projectId:   "ooh-bcf22",
 };
@@ -2006,7 +2697,7 @@ function initFirebase() {
     return;
   }
   try {
-    firebase.initializeApp(FB_CONFIG);
+    // initializeApp() was already called by initAuth(); just grab the database handle.
     fbDb = firebase.database();
     fbReady = true;
     sessionId = getOrCreateSessionId();
@@ -4511,12 +5202,278 @@ function bindEvents() {
     clearTimeout(rTimer);
     rTimer = setTimeout(() => { renderGantt(); renderMobileList(); }, 160);
   });
+
+  // Account menu (sign out + admin entry point) lives in the header
+  const acctBtn = document.getElementById("acct-btn");
+  if (acctBtn) acctBtn.addEventListener("click", openAccountMenu);
 }
 
 /* ============================================================
-   INIT
+   ROLE-BASED UI RESTRICTIONS
+   ============================================================
+   Server-side rules are the real enforcement; this is just to keep
+   the UI honest. View users get a read-only experience: edit pencils
+   gone, "+" buttons gone, pickers don't open, exports still allowed.
+*/
+function userRole() {
+  return (authProfile && authProfile.role) || "view";
+}
+function canEdit() {
+  const r = userRole();
+  return r === "edit" || r === "admin";
+}
+function isAdmin() {
+  return userRole() === "admin";
+}
+
+function applyRoleRestrictions() {
+  // Body-level class lets CSS hide/show role-gated affordances cheaply
+  document.body.classList.toggle("role-view",  userRole() === "view");
+  document.body.classList.toggle("role-edit",  userRole() === "edit");
+  document.body.classList.toggle("role-admin", userRole() === "admin");
+
+  // Render the account chip so the user sees who they are + can sign out
+  renderAccountChip();
+}
+
+// Header chip showing displayName + role, + admin gear when applicable.
+// Inserted into .top-right alongside the existing sync pill.
+function renderAccountChip() {
+  if (!authProfile) return;
+  const tr = document.querySelector(".top-right");
+  if (!tr) return;
+  let chip = document.getElementById("acct-chip");
+  if (!chip) {
+    chip = document.createElement("div");
+    chip.id = "acct-chip";
+    chip.className = "acct-chip";
+    chip.innerHTML =
+      '<button id="acct-btn" type="button" aria-label="Account menu">' +
+        '<span class="acct-avatar" id="acct-avatar"></span>' +
+        '<span class="acct-name" id="acct-name"></span>' +
+        '<span class="acct-role" id="acct-role"></span>' +
+      '</button>';
+    tr.appendChild(chip);
+    chip.querySelector("#acct-btn").addEventListener("click", openAccountMenu);
+  }
+  const initials = (authProfile.displayName || authProfile.email || "?")
+    .split(/\s+/).map(s => s[0] || "").join("").slice(0,2).toUpperCase();
+  document.getElementById("acct-avatar").textContent = initials;
+  document.getElementById("acct-name").textContent = authProfile.displayName || authProfile.email || "User";
+  const roleEl = document.getElementById("acct-role");
+  roleEl.textContent = userRole().toUpperCase();
+  roleEl.dataset.role = userRole();
+}
+
+function openAccountMenu() {
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.addEventListener("click", e => { if (e.target === wrap) closeModal(); });
+  const adminRow = isAdmin()
+    ? '<button class="acct-menu-item" id="am-admin"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg> User management</button>'
+    : '';
+  wrap.innerHTML =
+    '<div class="modal" style="max-width: 340px;">' +
+      '<div class="modal-head">' +
+        '<div>' +
+          '<div class="modal-head-sub">SIGNED IN AS</div>' +
+          '<div class="modal-head-title">' + escapeHtml(authProfile.displayName || authProfile.email) + '</div>' +
+          '<div style="font-size: 11px; color: var(--text-3); font-family: var(--ff-mono); margin-top: 4px;">' + escapeHtml(authProfile.email || "") + '</div>' +
+        '</div>' +
+        '<button class="modal-close" id="am-close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>' +
+      '</div>' +
+      '<div style="padding: 14px 18px;">' +
+        adminRow +
+        '<button class="acct-menu-item" id="am-signout">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>' +
+          ' Sign out' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+  document.getElementById("modal-root").appendChild(wrap);
+  wrap.querySelector("#am-close").addEventListener("click", closeModal);
+  wrap.querySelector("#am-signout").addEventListener("click", () => {
+    closeModal();
+    firebase.auth().signOut();
+  });
+  if (adminRow) {
+    wrap.querySelector("#am-admin").addEventListener("click", () => {
+      closeModal();
+      openAdminPanel();
+    });
+  }
+}
+
+/* ============================================================
+   ADMIN PANEL
    ============================================================ */
-function init() {
+function openAdminPanel() {
+  if (!isAdmin()) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.addEventListener("click", e => { if (e.target === wrap) closeModal(); });
+
+  let users = {};
+
+  const render = () => {
+    const arr = Object.entries(users).map(([uid, u]) => ({ uid, ...u }));
+    const pending  = arr.filter(u => u.status === "pending");
+    const active   = arr.filter(u => u.status === "approved").sort((a,b) => (b.lastSeen||0) - (a.lastSeen||0));
+    const rejected = arr.filter(u => u.status === "rejected");
+
+    const initials = (u) => (u.displayName || u.email || "?")
+      .split(/\s+/).map(s => s[0] || "").join("").slice(0,2).toUpperCase();
+
+    const timeAgo = (ts) => {
+      if (!ts) return "Never";
+      const s = (Date.now() - ts) / 1000;
+      if (s < 60) return "Active now";
+      if (s < 3600) return "Active " + Math.floor(s/60) + "m ago";
+      if (s < 86400) return "Active " + Math.floor(s/3600) + "h ago";
+      const d = Math.floor(s/86400);
+      if (d < 14) return "Active " + d + "d ago";
+      return "Last seen " + Math.floor(d/7) + "w ago";
+    };
+
+    const renderRow = (u, opts) => {
+      const isMe = u.uid === authUser.uid;
+      const meta = u.requestedAt && opts.kind === "pending"
+        ? "Requested " + timeAgo(u.requestedAt).replace("Active ","")
+        : (opts.kind === "active" ? timeAgo(u.lastSeen) : "");
+      const actions = opts.kind === "pending"
+        ? '<button class="adm-approve" data-uid="' + escapeAttr(u.uid) + '">✓ Approve</button>' +
+          '<button class="adm-reject" data-uid="' + escapeAttr(u.uid) + '">Reject</button>'
+        : opts.kind === "active"
+          ? '<select class="adm-role" data-uid="' + escapeAttr(u.uid) + '" ' + (isMe ? 'disabled' : '') + '>' +
+              ['view','edit','admin'].map(r => '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r.toUpperCase() + '</option>').join("") +
+            '</select>' +
+            (isMe ? '' : '<button class="adm-disable" data-uid="' + escapeAttr(u.uid) + '" title="Reject / disable">×</button>')
+          : '<button class="adm-restore" data-uid="' + escapeAttr(u.uid) + '">Restore</button>';
+
+      return '<div class="adm-row">' +
+        '<div class="adm-avatar' + (isMe ? ' me' : '') + '">' + escapeHtml(initials(u)) + '</div>' +
+        '<div class="adm-info">' +
+          '<div class="adm-name">' + escapeHtml(u.displayName || u.email || "?") + (isMe ? ' <span style="font-size:10px;color:var(--text-3);font-weight:400;">· you</span>' : '') + '</div>' +
+          '<div class="adm-email">' + escapeHtml(u.email || "") + '</div>' +
+        '</div>' +
+        (meta ? '<div class="adm-meta">' + escapeHtml(meta) + '</div>' : '') +
+        '<div class="adm-actions">' + actions + '</div>' +
+      '</div>';
+    };
+
+    const sectionHtml = (label, list, kind, badgeText) => {
+      if (list.length === 0) {
+        return '<div class="adm-section">' +
+          '<div class="adm-section-head">' +
+            '<span class="adm-section-label">' + label + '</span>' +
+            (badgeText ? '<span class="adm-section-count">' + badgeText + '</span>' : '<span style="font-size:10px;color:var(--text-3);">0</span>') +
+          '</div>' +
+          '<div class="adm-card"><div class="adm-empty">' + (kind === "pending" ? "No pending signups" : kind === "rejected" ? "No rejected accounts" : "No active users") + '</div></div>' +
+        '</div>';
+      }
+      return '<div class="adm-section">' +
+        '<div class="adm-section-head">' +
+          '<span class="adm-section-label">' + label + '</span>' +
+          (badgeText
+            ? '<span class="adm-section-count">' + badgeText + '</span>'
+            : '<span style="font-size:10px;color:var(--text-3);">' + list.length + '</span>') +
+        '</div>' +
+        '<div class="adm-card">' + list.map(u => renderRow(u, {kind})).join("") + '</div>' +
+      '</div>';
+    };
+
+    wrap.innerHTML =
+      '<div class="modal admin-modal">' +
+        '<div class="modal-head">' +
+          '<div>' +
+            '<div class="modal-head-sub">USER MANAGEMENT</div>' +
+            '<div class="modal-head-title">' + arr.length + ' users · ' + pending.length + ' pending</div>' +
+          '</div>' +
+          '<button class="modal-close" id="ad-close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>' +
+        '</div>' +
+        '<div class="adm-body">' +
+          sectionHtml("Pending approval", pending, "pending", pending.length > 0 ? pending.length + " new" : "") +
+          sectionHtml("Active users", active, "active", "") +
+          sectionHtml("Rejected · disabled", rejected, "rejected", "") +
+        '</div>' +
+      '</div>';
+
+    wrap.querySelector("#ad-close").addEventListener("click", closeModal);
+
+    // Approve / reject pending
+    wrap.querySelectorAll(".adm-approve").forEach(b => b.addEventListener("click", async () => {
+      const uid = b.dataset.uid;
+      try {
+        await firebase.database().ref("users/" + uid).update({
+          status: "approved",
+          role: "view",
+          approvedAt: firebase.database.ServerValue.TIMESTAMP,
+          approvedBy: authUser.uid,
+        });
+        toast("Approved");
+      } catch (e) { toast("Approve failed: " + (e.message || e)); }
+    }));
+    wrap.querySelectorAll(".adm-reject").forEach(b => b.addEventListener("click", async () => {
+      const uid = b.dataset.uid;
+      if (!confirm("Reject this signup request?")) return;
+      try {
+        await firebase.database().ref("users/" + uid).update({ status: "rejected" });
+        toast("Rejected");
+      } catch (e) { toast("Reject failed: " + (e.message || e)); }
+    }));
+    // Role change
+    wrap.querySelectorAll(".adm-role").forEach(s => s.addEventListener("change", async () => {
+      const uid = s.dataset.uid;
+      const newRole = s.value;
+      try {
+        await firebase.database().ref("users/" + uid + "/role").set(newRole);
+        toast("Role updated to " + newRole.toUpperCase());
+      } catch (e) {
+        toast("Role change failed");
+        s.value = users[uid].role;   // revert
+      }
+    }));
+    // Disable active user (move to rejected)
+    wrap.querySelectorAll(".adm-disable").forEach(b => b.addEventListener("click", async () => {
+      const uid = b.dataset.uid;
+      if (!confirm("Disable this user's access?")) return;
+      try {
+        await firebase.database().ref("users/" + uid + "/status").set("rejected");
+        toast("User disabled");
+      } catch (e) { toast("Failed"); }
+    }));
+    // Restore rejected user back to approved
+    wrap.querySelectorAll(".adm-restore").forEach(b => b.addEventListener("click", async () => {
+      const uid = b.dataset.uid;
+      try {
+        await firebase.database().ref("users/" + uid + "/status").set("approved");
+        toast("User restored");
+      } catch (e) { toast("Failed"); }
+    }));
+  };
+
+  document.getElementById("modal-root").appendChild(wrap);
+
+  // Subscribe to /users — admin gets live updates as people sign up / change
+  const usersRef = firebase.database().ref("users");
+  const onUsers = (snap) => {
+    users = snap.val() || {};
+    render();
+  };
+  usersRef.on("value", onUsers);
+
+  // Detach when modal closes — repurpose closeModal hook
+  const origClose = closeModal;
+  window.closeModal = function() {
+    usersRef.off("value", onUsers);
+    window.closeModal = origClose;
+    origClose();
+  };
+}
+
+
+function bootstrapApp() {
   if (!loadState()) {
     state.campaigns = JSON.parse(JSON.stringify(DEFAULT_CAMPAIGNS));
     state.schedule = emptySchedule();
@@ -4529,19 +5486,17 @@ function init() {
   renderDate();
   rerenderAll();
   bindEvents();
-  // Apply any ?country=...&city=...&campaign=... params from the URL. We do
-  // this AFTER the dropdowns have been populated so the <select> elements
-  // have the options to select. A second rerenderAll reflects the filter.
   applyFiltersFromURL();
   rerenderAll();
   setInterval(renderDate, 60 * 1000);
-  // Connect to shared Firebase database — remote state will overlay local
-  // cache as soon as it arrives. If Firebase is unreachable we stay in
-  // localStorage-only mode gracefully.
+  // Connect to shared Firebase database. Auth has already initialised
+  // firebase.initializeApp() — we just hook up the database subscription.
   initFirebase();
+  // Apply role-based UI restrictions on top of the rendered dashboard
+  applyRoleRestrictions();
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", initAuth);
 
 // Diagnostic helper — paste `oohDebug()` in DevTools console to inspect state
 window.oohDebug = function() {
