@@ -746,7 +746,7 @@
     gap: 14px;
     margin-bottom: 18px;
   }
-  @media (min-width: 1024px) { .panels-row { grid-template-columns: 1.7fr 1fr; } }
+  @media (min-width: 1024px) { .panels-row { grid-template-columns: 1.2fr 1fr; } }
 
   .panel {
     background: var(--surf);
@@ -839,6 +839,13 @@
   .dist-bar-wrap { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 0 8px; min-width: 50px; }
   .dist-bar { height: 100%; border-radius: 2px; transition: width 260ms ease; }
   .dist-val { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; font-size: 11px; }
+  .dist-val-stack {
+    display: flex; flex-direction: column; align-items: flex-end;
+    font-variant-numeric: tabular-nums; line-height: 1.2;
+    min-width: 70px;
+  }
+  .dist-val-money { color: var(--text); font-weight: 600; font-size: 12px; }
+  .dist-val-weeks { color: var(--text-3); font-weight: 500; font-size: 10px; margin-top: 2px; }
 
   .empty-state {
     padding: 30px 16px;
@@ -917,14 +924,16 @@
     .panel:has(#camp-tbody) #camp-count {
       margin-left: auto;
     }
-    /* Hide order + slot columns — swatch already encodes slot colour, and
-       the order arrows are awkward on touch. Users can reorder from desktop. */
-    .tbl-col-order, .tbl-col-slot { display: none; }
-    #camp-tbody td:nth-child(2), #camp-tbody td:nth-child(4) { display: none; }
+    /* Hide order column on narrow viewports — swatch encodes slot colour and
+       the arrow buttons are awkward on touch. Users can reorder from desktop. */
+    .tbl-col-order { display: none; }
+    #camp-tbody td:nth-child(2) { display: none; }
     /* Reclaim width for the Usage column and trim cell padding */
     .tbl tbody td { padding: 10px 10px; font-size: 12.5px; }
     .tbl thead th { padding: 10px 10px; }
     .tbl-col-usage { width: auto; }
+    /* Value column tightens on mobile */
+    .tbl-col-value { white-space: nowrap; padding-left: 4px !important; padding-right: 4px !important; }
   }
 
   .ml-card {
@@ -954,6 +963,14 @@
     line-height: 1.2;
   }
   .ml-card-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; align-items: center; }
+  .ml-card-stat {
+    font-family: var(--ff-mono);
+    font-size: 9px;
+    color: var(--text-3);
+    margin-top: 4px;
+    line-height: 1.3;
+    font-variant-numeric: tabular-nums;
+  }
   .ml-card-actions { display: flex; gap: 4px; align-items: center; }
   .ml-card-edit {
     width: 28px; height: 28px;
@@ -1623,6 +1640,34 @@
   }
   @media (max-width: 640px) { .search { width: 140px; } }
 
+  /* Sort dropdown — sits between Search and "+ Add" in the campaign panel */
+  .sort-wrap {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .sort-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .sort-select {
+    background: var(--surf-2);
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 12px;
+    font-family: var(--ff);
+    padding: 6px 22px 6px 10px;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 4l3 3 3-3' stroke='%239AA5B8' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+  }
+  .sort-select:focus { outline: none; border-color: var(--accent); }
+  @media (max-width: 640px) {
+    .sort-label { display: none; }
+    .sort-select { padding: 6px 22px 6px 8px; }
+  }
+
   /* Table */
   .tbl { width: 100%; border-collapse: collapse; }
   .tbl thead th {
@@ -1991,29 +2036,29 @@
   <!-- ======== KPI STRIP ======== -->
   <section class="kpis fade-up" style="animation-delay: 80ms;">
     <div class="kpi" style="--top-border: var(--mint);">
-      <div class="kpi-label">Total locations</div>
+      <div class="kpi-label" id="kpi-locations-label">Total locations</div>
       <div class="kpi-value" id="kpi-locations">13</div>
-      <div class="kpi-sub" id="kpi-locations-sub">13 base · 0 custom</div>
+      <div class="kpi-sub" id="kpi-locations-sub">network</div>
     </div>
     <div class="kpi" style="--top-border: var(--accent);">
-      <div class="kpi-label">Faces inventory</div>
+      <div class="kpi-label" id="kpi-faces-label">Faces inventory</div>
       <div class="kpi-value" id="kpi-faces">1,640</div>
-      <div class="kpi-sub">total network</div>
+      <div class="kpi-sub" id="kpi-faces-sub">total network</div>
     </div>
     <div class="kpi" style="--top-border: var(--amber);">
       <div class="kpi-label">Peak reach</div>
       <div class="kpi-value" id="kpi-peak">—</div>
       <div class="kpi-sub" id="kpi-peak-sub">—</div>
     </div>
-    <div class="kpi" style="--top-border: var(--yellow);">
-      <div class="kpi-label">Avg weekly reach</div>
-      <div class="kpi-value" id="kpi-avg">—</div>
-      <div class="kpi-sub">across Mar–Dec</div>
-    </div>
     <div class="kpi" style="--top-border: var(--green);">
-      <div class="kpi-label">Active weeks</div>
-      <div class="kpi-value" id="kpi-active-wks">0</div>
-      <div class="kpi-sub">of 40 total</div>
+      <div class="kpi-label" id="kpi-value-label">Total value</div>
+      <div class="kpi-value" id="kpi-value">—</div>
+      <div class="kpi-sub" id="kpi-value-sub">$ / week</div>
+    </div>
+    <div class="kpi" style="--top-border: var(--yellow);">
+      <div class="kpi-label" id="kpi-footfall-label">Total footfall</div>
+      <div class="kpi-value" id="kpi-footfall">—</div>
+      <div class="kpi-sub" id="kpi-footfall-sub">/ week</div>
     </div>
     <div class="kpi" style="--top-border: var(--pink);">
       <div class="kpi-label">Campaigns in play</div>
@@ -2096,6 +2141,15 @@
           <svg class="search-icon" width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
           <input type="text" id="camp-search" class="search" dir="ltr" placeholder="Search campaigns…">
         </div>
+        <div class="sort-wrap">
+          <label class="sort-label" for="camp-sort">Sort</label>
+          <select id="camp-sort" class="sort-select">
+            <option value="order">Order</option>
+            <option value="name">Name</option>
+            <option value="usage">Usage</option>
+            <option value="value">Value</option>
+          </select>
+        </div>
         <button class="btn-primary" id="add-campaign">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           Add campaign
@@ -2109,8 +2163,8 @@
             <th class="tbl-col-color"></th>
             <th class="tbl-col-order" style="width: 80px; text-align: center;">Order</th>
             <th>Name</th>
-            <th class="tbl-col-slot">Slot</th>
             <th class="tbl-col-usage">Usage</th>
+            <th class="tbl-col-value" style="text-align: right;">Value</th>
             <th class="tbl-col-actions"></th>
           </tr>
         </thead>
@@ -2397,19 +2451,19 @@ const SLOT_COLORS = [
 const MAX_CAMPAIGNS = SLOT_COLORS.length;  // 40
 
 const BASE_LOCATIONS = [
-  { id:"citywalk",   name:"Citywalk",             country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:49,  photo:"01_dubai_citywalk",       notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
-  { id:"jbr",        name:"JBR",                  country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:46,  photo:"02_dubai_jbr",            notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
-  { id:"marina",     name:"Marina Hoarding",      country:"United Arab Emirates", cities:["Dubai"],             screen:"Static",  faces:1,   photo:"03_dubai_marina_hoarding",notes:"Static · one creative per period" },
-  { id:"downtown",   name:"Downtown Luxe Screen", country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:1,   photo:"04_dubai_downtown_luxe",  notes:"Premium placement" },
-  { id:"bluewaters", name:"Bluewaters",           country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:13,  photo:"09_dubai_bluewaters",     notes:"2 mo FOC · peak summer" },
-  { id:"giga",       name:"Giga Screen",          country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:1,   photo:"10_dubai_giga_screen",    notes:"FOC: 2 mo 2026 (+2 mo 2027)" },
-  { id:"ummsuqeim",  name:"Umm Suqeim Unipoles",  country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:2,   photo:"11_dubai_umm_suqeim",     notes:"2 mo FOC · peak summer" },
-  { id:"triplecrown",name:"Triple Crown",         country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:6,   photo:"05_ad_triple_crown",      notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
-  { id:"nationtwrs", name:"Nation Towers Screen", country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:1,   photo:"06_ad_nation_towers",     notes:"Premium placement" },
-  { id:"touristclub",name:"Tourist Club, Mariah Main", country:"United Arab Emirates", cities:["Abu Dhabi"],    screen:"Static",  faces:1,   photo:"07_ad_tourist_club",      notes:"FOC: 2 production costs" },
-  { id:"galleria",   name:"Galleria Mall",        country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:272, photo:"08_ad_galleria_mall",     notes:"16 mo total (+4 outdoor / 20 indoor)" },
-  { id:"hotels",     name:"Hotel Network",        country:"United Arab Emirates", cities:["Abu Dhabi","Dubai"], screen:"Digital",  faces:270, photo:"12_hotel_network",        notes:"106 hotels · indoor digital · 5 mo paid + 3 mo FOC" },
-  { id:"malls",      name:"AD & Dubai Malls",     country:"United Arab Emirates", cities:["Abu Dhabi","Dubai"], screen:"Digital",  faces:977, photo:"13_ad_dubai_malls",       notes:"28 malls · indoor digital · +1 bonus spot network-wide" },
+  { id:"citywalk",   name:"Citywalk",             country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:49, valuePerWeek:0, footfallPerWeek:0,  photo:"01_dubai_citywalk",       notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
+  { id:"jbr",        name:"JBR",                  country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:46, valuePerWeek:0, footfallPerWeek:0,  photo:"02_dubai_jbr",            notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
+  { id:"marina",     name:"Marina Hoarding",      country:"United Arab Emirates", cities:["Dubai"],             screen:"Static",  faces:1, valuePerWeek:0, footfallPerWeek:0,   photo:"03_dubai_marina_hoarding",notes:"Static · one creative per period" },
+  { id:"downtown",   name:"Downtown Luxe Screen", country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:1, valuePerWeek:0, footfallPerWeek:0,   photo:"04_dubai_downtown_luxe",  notes:"Premium placement" },
+  { id:"bluewaters", name:"Bluewaters",           country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:13, valuePerWeek:0, footfallPerWeek:0,  photo:"09_dubai_bluewaters",     notes:"2 mo FOC · peak summer" },
+  { id:"giga",       name:"Giga Screen",          country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:1, valuePerWeek:0, footfallPerWeek:0,   photo:"10_dubai_giga_screen",    notes:"FOC: 2 mo 2026 (+2 mo 2027)" },
+  { id:"ummsuqeim",  name:"Umm Suqeim Unipoles",  country:"United Arab Emirates", cities:["Dubai"],             screen:"Digital", faces:2, valuePerWeek:0, footfallPerWeek:0,   photo:"11_dubai_umm_suqeim",     notes:"2 mo FOC · peak summer" },
+  { id:"triplecrown",name:"Triple Crown",         country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:6, valuePerWeek:0, footfallPerWeek:0,   photo:"05_ad_triple_crown",      notes:"6 mo paid + 2 mo FOC (Nov–Dec)" },
+  { id:"nationtwrs", name:"Nation Towers Screen", country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:1, valuePerWeek:0, footfallPerWeek:0,   photo:"06_ad_nation_towers",     notes:"Premium placement" },
+  { id:"touristclub",name:"Tourist Club, Mariah Main", country:"United Arab Emirates", cities:["Abu Dhabi"],    screen:"Static",  faces:1, valuePerWeek:0, footfallPerWeek:0,   photo:"07_ad_tourist_club",      notes:"FOC: 2 production costs" },
+  { id:"galleria",   name:"Galleria Mall",        country:"United Arab Emirates", cities:["Abu Dhabi"],         screen:"Digital", faces:272, valuePerWeek:0, footfallPerWeek:0, photo:"08_ad_galleria_mall",     notes:"16 mo total (+4 outdoor / 20 indoor)" },
+  { id:"hotels",     name:"Hotel Network",        country:"United Arab Emirates", cities:["Abu Dhabi","Dubai"], screen:"Digital",  faces:270, valuePerWeek:0, footfallPerWeek:0, photo:"12_hotel_network",        notes:"106 hotels · indoor digital · 5 mo paid + 3 mo FOC" },
+  { id:"malls",      name:"AD & Dubai Malls",     country:"United Arab Emirates", cities:["Abu Dhabi","Dubai"], screen:"Digital",  faces:977, valuePerWeek:0, footfallPerWeek:0, photo:"13_ad_dubai_malls",       notes:"28 malls · indoor digital · +1 bonus spot network-wide" },
 ];
 
 const DEFAULT_CAMPAIGNS = [
@@ -2489,6 +2543,7 @@ const state = {
   schedule: {},
   filter: { country: "all", city: "all", campaign: "all" },
   campSearch: "",
+  campSort: "order",
 };
 
 const cellKey = (locId, track) => locId + ":" + track;
@@ -3041,24 +3096,78 @@ function renderDate() {
    ============================================================ */
 function renderKPIs() {
   const reach = getReachByWeek();
-  const filtered = getFilteredLocations();
-  const totalFaces = filtered.reduce((a,L)=>a+L.faces,0);
   const peak = Math.max(...reach, 0);
   const peakIdx = reach.indexOf(peak);
-  const nonZero = reach.filter(v=>v>0);
-  const avg = nonZero.length ? Math.round(nonZero.reduce((a,b)=>a+b,0) / nonZero.length) : 0;
-  const activeWks = reach.filter(v=>v>0).length;
   const usage = getCampaignUsage();
   const inPlay = Object.values(usage).filter(v=>v>0).length;
 
-  document.getElementById("kpi-locations").textContent = filtered.length;
-  document.getElementById("kpi-locations-sub").textContent =
-    BASE_LOCATIONS.length + " base · " + (state.userLocations ? state.userLocations.length : 0) + " custom";
-  document.getElementById("kpi-faces").textContent = totalFaces.toLocaleString();
+  // Two display modes: NETWORK (default — no campaign filter) vs CAMPAIGN
+  // (campaign filter active — show that campaign's allocated totals).
+  const filteredCampId = state.filter.campaign && state.filter.campaign !== "all"
+    ? state.filter.campaign : null;
+  const camp = filteredCampId ? getCampaignById(filteredCampId) : null;
+
+  // Locations / Faces / Value / Footfall calculation
+  let locationsCount, facesTotal, valuePerWeekTotal, footfallPerWeekTotal;
+  let locationsLabel, locationsSub, facesSub, valueSub, footfallSub;
+
+  if (camp) {
+    // Per-campaign mode: only locations + faces actually used by this campaign
+    const usedLocs = new Set();
+    for (const L of allLocations()) {
+      for (let w = 0; w < WEEK_COUNT; w++) {
+        if (campaignShareAt(L.id, w, camp.id) > 0) { usedLocs.add(L.id); break; }
+      }
+    }
+    locationsCount = usedLocs.size;
+    facesTotal = 0;
+    for (const L of allLocations()) {
+      if (usedLocs.has(L.id)) facesTotal += (L.faces || 0);
+    }
+    // Half-share-applied totals across the campaign's footprint
+    const tot = campaignTotals(camp.id);
+    valuePerWeekTotal = tot.totalValue;        // total $ allocated across the schedule
+    footfallPerWeekTotal = tot.totalFootfall;  // total footfall allocated across the schedule
+
+    locationsLabel = "Campaign locations";
+    locationsSub = camp.name;
+    facesSub = "in this campaign";
+    valueSub = "campaign total";
+    footfallSub = "campaign total";
+  } else {
+    // Network mode (default): snapshot of the full inventory
+    const all = allLocations();
+    locationsCount = all.length;
+    facesTotal = all.reduce((a,L) => a + (L.faces || 0), 0);
+    valuePerWeekTotal = all.reduce((a,L) => a + (L.valuePerWeek || 0), 0);
+    footfallPerWeekTotal = all.reduce((a,L) => a + (L.footfallPerWeek || 0), 0);
+
+    locationsLabel = "Total locations";
+    locationsSub = "network";
+    facesSub = "total network";
+    valueSub = "$ / week";
+    footfallSub = "/ week";
+  }
+
+  document.getElementById("kpi-locations-label").textContent = locationsLabel;
+  document.getElementById("kpi-locations").textContent = locationsCount.toLocaleString();
+  document.getElementById("kpi-locations-sub").textContent = locationsSub;
+
+  document.getElementById("kpi-faces").textContent = facesTotal.toLocaleString();
+  document.getElementById("kpi-faces-sub").textContent = facesSub;
+
   document.getElementById("kpi-peak").textContent = peak > 0 ? peak.toLocaleString() : "—";
   document.getElementById("kpi-peak-sub").textContent = peak > 0 ? (MONTHS[Math.floor(peakIdx/4)] + " W" + ((peakIdx%4)+1)) : "No allocations yet";
-  document.getElementById("kpi-avg").textContent = avg > 0 ? avg.toLocaleString() : "—";
-  document.getElementById("kpi-active-wks").textContent = activeWks;
+
+  // Format value as $X with thousands; show "—" if zero rather than "$0"
+  document.getElementById("kpi-value").textContent =
+    valuePerWeekTotal > 0 ? "$" + Math.round(valuePerWeekTotal).toLocaleString("en-US") : "—";
+  document.getElementById("kpi-value-sub").textContent = valueSub;
+
+  document.getElementById("kpi-footfall").textContent =
+    footfallPerWeekTotal > 0 ? Math.round(footfallPerWeekTotal).toLocaleString("en-US") : "—";
+  document.getElementById("kpi-footfall-sub").textContent = footfallSub;
+
   document.getElementById("kpi-campaigns").textContent = inPlay;
   document.getElementById("kpi-campaigns-sub").textContent = "of " + state.campaigns.length + " total";
 }
@@ -3118,16 +3227,38 @@ function renderDistribution() {
   const list = document.getElementById("dist-list");
   list.innerHTML = "";
   const usage = getCampaignUsage();
-  const sorted = state.campaigns
-    .map(c => ({...c, weeks: usage[c.id] || 0}))
-    .sort((a,b) => b.weeks - a.weeks);
-  const max = Math.max(...sorted.map(c=>c.weeks), 1);
+
+  // Per-campaign value (with half-share rule). For the default sort we want
+  // highest-value first; if every campaign has $0 (data not yet entered),
+  // fall back to sorting by weeks count so the chart still tells a story.
+  const enriched = state.campaigns.map(c => {
+    const tot = campaignTotals(c.id);
+    return {
+      ...c,
+      weeks: usage[c.id] || 0,
+      value: tot.totalValue,
+    };
+  });
+  const totalValueSum = enriched.reduce((a, c) => a + c.value, 0);
+  const sortByValue = totalValueSum > 0;
+
+  const sorted = enriched.sort((a, b) => {
+    if (sortByValue) return b.value - a.value || b.weeks - a.weeks;
+    return b.weeks - a.weeks;
+  });
+
+  // Bar lengths scale to whichever metric we're sorting by — that keeps the
+  // visual ranking consistent with the textual ordering.
+  const max = sortByValue
+    ? Math.max(...sorted.map(c => c.value), 1)
+    : Math.max(...sorted.map(c => c.weeks), 1);
+
   const topN = sorted.slice(0, 10);
-  const inPlay = sorted.filter(c=>c.weeks>0).length;
+  const inPlay = sorted.filter(c => c.weeks > 0).length;
 
   document.getElementById("dist-sub").textContent = inPlay + " in play · top 10 shown";
 
-  if (topN.every(c=>c.weeks===0)) {
+  if (topN.every(c => c.weeks === 0 && c.value === 0)) {
     list.innerHTML = '<div class="empty-state">No campaigns allocated yet.<br><span style="color: var(--text-2); font-size: 11px; margin-top: 4px; display: inline-block;">Click any cell in the Gantt below to start.</span></div>';
     return;
   }
@@ -3135,21 +3266,30 @@ function renderDistribution() {
   for (const c of topN) {
     const row = document.createElement("div");
     row.className = "dist-row";
-    const pct = max > 0 ? (c.weeks / max) * 100 : 0;
+    const metric = sortByValue ? c.value : c.weeks;
+    const pct = max > 0 ? (metric / max) * 100 : 0;
     const color = SLOT_COLORS[c.slot] || "#666";
-    row.innerHTML =
-      '<span class="dist-chip" style="background:' + color + '"></span>' +
-      '<span class="dist-name">' + escapeHtml(c.name) + '</span>' +
-      '<div class="dist-bar-wrap" style="grid-column: 2 / 3; margin-top: 4px;"><div class="dist-bar" style="width:' + pct + '%; background:' + color + '"></div></div>' +
-      '<span class="dist-val">' + c.weeks + ' wk</span>';
-    // Actually simpler: column structure puts bar as a pseudo-element. Let me use a grid.
+
+    // Right-side label: weeks count plus $value if any campaign has value data.
+    // Each piece is right-aligned in its own span so columns line up across rows.
+    const weeksLabel = c.weeks + ' wk';
+    const valueLabel = c.value > 0
+      ? '$' + Math.round(c.value).toLocaleString("en-US")
+      : '';
+    const rightSide = sortByValue || c.value > 0
+      ? '<span class="dist-val-stack">' +
+          '<span class="dist-val-money">' + (valueLabel || '—') + '</span>' +
+          '<span class="dist-val-weeks">' + weeksLabel + '</span>' +
+        '</span>'
+      : '<span class="dist-val">' + weeksLabel + '</span>';
+
     row.innerHTML =
       '<span class="dist-chip" style="background:' + color + '"></span>' +
       '<div style="display:flex; align-items:center; gap:10px; min-width: 0;">' +
         '<span class="dist-name">' + escapeHtml(c.name) + '</span>' +
         '<div class="dist-bar-wrap"><div class="dist-bar" style="width:' + pct + '%; background:' + color + '"></div></div>' +
       '</div>' +
-      '<span class="dist-val">' + c.weeks + ' wk</span>';
+      rightSide;
     list.appendChild(row);
   }
 }
@@ -3194,7 +3334,7 @@ function renderGantt() {
           '<span class="g-loc-chip ' + screenClass + '">' + escapeHtml(L.screen) + '</span>' +
           userTag +
         '</div>' +
-        '<div class="g-loc-faces">' + L.faces.toLocaleString() + ' face' + (L.faces===1?'':'s') + '</div>' +
+        '<div class="g-loc-faces">' + escapeHtml(formatLocationMeta(L)) + '</div>' +
       '</div>' +
       '<button class="g-loc-edit" data-loc-id="' + escapeAttr(L.id) + '" aria-label="Edit location"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-7 7H4.5v-2l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>';
     row.querySelector(".g-loc-edit").addEventListener("click", (e) => {
@@ -3327,6 +3467,67 @@ function rangeLabel(start, end) {
   return weekLabel(start) + " – " + weekLabel(end);
 }
 
+/* ============================================================
+   LOCATION META FORMATTING
+   ============================================================
+   Builds the "1 face, $100/week, 3,000 footfall/week" meta line shown on
+   each location card. value and footfall pieces are dropped silently when
+   they're 0 / missing — keeps the line clean for legacy data without those
+   fields filled in yet. The boolean `compact` returns a shorter version
+   for tight spaces (e.g. mobile chips).
+*/
+function formatLocationMeta(L) {
+  const parts = [];
+  if (L.faces != null) {
+    parts.push(L.faces.toLocaleString() + " face" + (L.faces === 1 ? "" : "s"));
+  }
+  if (L.valuePerWeek && L.valuePerWeek > 0) {
+    parts.push("$" + Number(L.valuePerWeek).toLocaleString("en-US") + "/week");
+  }
+  if (L.footfallPerWeek && L.footfallPerWeek > 0) {
+    parts.push(Number(L.footfallPerWeek).toLocaleString("en-US") + " footfall/week");
+  }
+  return parts.join(", ");
+}
+
+/* For each location-week, returns the share (0..1) of that location's
+   weekly value/footfall that the given campaign claims. If the campaign
+   isn't present at all, returns 0. If it's the only campaign on that
+   location during that week (other track empty or running same campaign),
+   returns 1. If a different campaign is concurrently running on the
+   other track, returns 0.5 — split equally. */
+function campaignShareAt(locId, weekIdx, campId) {
+  const main = (state.schedule[cellKey(locId, "main")] || [])[weekIdx];
+  const overlay = (state.schedule[cellKey(locId, "overlay")] || [])[weekIdx];
+  const onMain = main === campId;
+  const onOverlay = overlay === campId;
+  if (!onMain && !onOverlay) return 0;
+  // Distinct concurrent campaigns at this location-week
+  const distinct = new Set();
+  if (main != null) distinct.add(main);
+  if (overlay != null) distinct.add(overlay);
+  return 1 / distinct.size;
+}
+
+/* Sum up a campaign's weighted value/footfall across every location-week
+   it occupies. Returns { totalValue, totalFootfall } in absolute $/footfall. */
+function campaignTotals(campId) {
+  let totalValue = 0, totalFootfall = 0;
+  for (const L of allLocations()) {
+    const v = L.valuePerWeek || 0;
+    const f = L.footfallPerWeek || 0;
+    if (!v && !f) continue;
+    for (let w = 0; w < WEEK_COUNT; w++) {
+      const share = campaignShareAt(L.id, w, campId);
+      if (share > 0) {
+        totalValue    += v * share;
+        totalFootfall += f * share;
+      }
+    }
+  }
+  return { totalValue, totalFootfall };
+}
+
 function renderMobileList() {
   const container = document.getElementById("mobile-loc-list");
   if (!container) return;
@@ -3376,6 +3577,7 @@ function renderMobileList() {
             cityChips +
             '<span class="g-loc-chip ' + screenClass + '">' + escapeHtml(L.screen) + '</span>' +
           '</div>' +
+          '<div class="ml-card-stat">' + escapeHtml(formatLocationMeta(L)) + '</div>' +
         '</div>' +
         '<div class="ml-card-actions">' +
           '<button class="ml-card-edit" aria-label="Edit location"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-7 7H4.5v-2l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>' +
@@ -3813,11 +4015,36 @@ function renderCampaignTable() {
   const tbody = document.getElementById("camp-tbody");
   const countEl = document.getElementById("camp-count");
   const q = state.campSearch.toLowerCase();
+  const sortMode = state.campSort || "order";
   const usage = getCampaignUsage();
-  // Respect array order (= display order)
-  const filtered = state.campaigns
-    .map((c, idx) => ({ ...c, _idx: idx }))
-    .filter(c => !q || c.name.toLowerCase().includes(q));
+
+  // Build full set with metadata before filtering — keeps original order index
+  // available so the arrow buttons can still move rows in display-order.
+  const enriched = state.campaigns.map((c, idx) => {
+    const tot = campaignTotals(c.id);
+    return {
+      ...c,
+      _idx: idx,                  // position in state.campaigns (= true order)
+      _usage: usage[c.id] || 0,
+      _value: tot.totalValue,
+    };
+  });
+
+  // Apply search filter
+  let filtered = enriched.filter(c => !q || c.name.toLowerCase().includes(q));
+
+  // Apply sort. For non-order modes, secondary tiebreak is the original order
+  // so equal-valued rows are stable.
+  if (sortMode === "name") {
+    filtered.sort((a, b) => a.name.localeCompare(b.name) || a._idx - b._idx);
+  } else if (sortMode === "usage") {
+    filtered.sort((a, b) => b._usage - a._usage || a._idx - b._idx);
+  } else if (sortMode === "value") {
+    filtered.sort((a, b) => b._value - a._value || a._idx - b._idx);
+  } else {
+    // "order" — already in array order via _idx
+    filtered.sort((a, b) => a._idx - b._idx);
+  }
 
   countEl.textContent = filtered.length + " / " + state.campaigns.length + " shown · max " + MAX_CAMPAIGNS;
 
@@ -3827,16 +4054,22 @@ function renderCampaignTable() {
   }
 
   tbody.innerHTML = "";
-  const maxUsage = Math.max(...filtered.map(c => usage[c.id] || 0), 1);
+  const maxUsage = Math.max(...filtered.map(c => c._usage), 1);
   const total = state.campaigns.length;
+  const orderMode = sortMode === "order";
 
   for (const c of filtered) {
-    const u = usage[c.id] || 0;
+    const u = c._usage;
+    const v = c._value;
     const pct = (u / maxUsage) * 100;
     const color = SLOT_COLORS[c.slot] || "#666";
     const idx = c._idx;
-    const canUp = idx > 0;
-    const canDown = idx < total - 1;
+    // Arrows only meaningful when displaying in true order
+    const canUp   = orderMode && idx > 0;
+    const canDown = orderMode && idx < total - 1;
+    const valueLabel = v > 0
+      ? '$' + Math.round(v).toLocaleString("en-US")
+      : '<span style="color:var(--text-3)">—</span>';
 
     const tr = document.createElement("tr");
     tr.dataset.id = c.id;
@@ -3852,8 +4085,8 @@ function renderCampaignTable() {
         '</span>' +
       '</td>' +
       '<td><div style="font-weight: 500; color: var(--text);">' + escapeHtml(c.name) + '</div></td>' +
-      '<td class="tbl-col-slot"><span style="font-family: var(--ff-mono); font-size: 11px; color: var(--text-3);">' + (c.slot+1) + '</span></td>' +
       '<td class="tbl-col-usage"><div class="usage-bar-wrap"><div class="usage-bar"><div class="usage-bar-fill" style="width:' + pct + '%; background:' + color + ';"></div></div><span class="usage-num">' + u + ' wk</span></div></td>' +
+      '<td class="tbl-col-value" style="text-align:right; font-family: var(--ff-mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text);">' + valueLabel + '</td>' +
       '<td class="tbl-col-actions"><button class="row-menu-btn" aria-label="Edit"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-7 7H4.5v-2l7-7z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button></td>';
 
     // Wire arrow buttons (stopPropagation so row-click-to-edit doesn't fire)
@@ -4190,7 +4423,7 @@ function openLightbox(L) {
     '<img class="lightbox-img" src="' + escapeAttr(photoSrc(L)) + '" alt="">' +
     '<div class="lightbox-meta">' +
       escapeHtml(L.name) +
-      '<div class="lightbox-meta-sub">' + escapeHtml(cities) + ' · ' + escapeHtml(L.screen) + ' · ' + L.faces.toLocaleString() + ' face' + (L.faces===1?'':'s') + '</div>' +
+      '<div class="lightbox-meta-sub">' + escapeHtml(cities) + ' · ' + escapeHtml(L.screen) + ' · ' + escapeHtml(formatLocationMeta(L)) + '</div>' +
     '</div>';
   wrap.addEventListener("click", closeModal);
   document.getElementById("modal-root").appendChild(wrap);
@@ -4373,6 +4606,8 @@ function openLocationEditor(existing) {
     ),
     screen: isNew ? "Digital" : (["Digital","Static"].includes(existing.screen) ? existing.screen : "Digital"),
     faces: isNew ? 1 : existing.faces,
+    valuePerWeek:    isNew ? 0 : (existing.valuePerWeek    || 0),
+    footfallPerWeek: isNew ? 0 : (existing.footfallPerWeek || 0),
     notes: isNew ? "" : (existing.notes || ""),
     photo: isNew ? "" : (existing.photo || ""),
   };
@@ -4487,6 +4722,19 @@ function openLocationEditor(existing) {
             '</div>' +
           '</div>' +
 
+          // VALUE + FOOTFALL — both per-week. Footfall accepts thousand
+          // separators (e.g. "3,000") in the input — we strip them on save.
+          '<div class="field-row">' +
+            '<div class="field">' +
+              '<label class="field-label" for="lx-value">Value / week ($)</label>' +
+              '<input type="number" min="0" step="1" class="field-input" id="lx-value" placeholder="e.g. 100" value="' + (draft.valuePerWeek || 0) + '">' +
+            '</div>' +
+            '<div class="field">' +
+              '<label class="field-label" for="lx-footfall">Footfall / week</label>' +
+              '<input type="text" inputmode="numeric" class="field-input" id="lx-footfall" placeholder="e.g. 3,000" value="' + (draft.footfallPerWeek ? Number(draft.footfallPerWeek).toLocaleString("en-US") : "") + '">' +
+            '</div>' +
+          '</div>' +
+
           // NOTES
           '<div class="field">' +
             '<label class="field-label" for="lx-notes">Notes (optional)</label>' +
@@ -4587,6 +4835,17 @@ function openLocationEditor(existing) {
       const v = parseInt(e.target.value, 10);
       draft.faces = (isNaN(v) || v < 0) ? 0 : v;
     });
+    // Value (numeric) — straightforward int parse, store as $/week
+    wrap.querySelector("#lx-value").addEventListener("input", e => {
+      const v = parseFloat(e.target.value);
+      draft.valuePerWeek = (isNaN(v) || v < 0) ? 0 : Math.round(v);
+    });
+    // Footfall — strip commas/spaces so users can type "3,000" naturally
+    wrap.querySelector("#lx-footfall").addEventListener("input", e => {
+      const cleaned = String(e.target.value || "").replace(/[\s,]/g, "");
+      const v = parseInt(cleaned, 10);
+      draft.footfallPerWeek = (isNaN(v) || v < 0) ? 0 : v;
+    });
     wrap.querySelector("#lx-notes").addEventListener("input", e => draft.notes = e.target.value);
 
     // Photo upload
@@ -4668,6 +4927,8 @@ function openLocationEditor(existing) {
     const editingBase = !isNew && isBaseLocationId(draft.id);
     const entry = {
       id: draft.id, name, country, cities, screen: draft.screen, faces,
+      valuePerWeek:    Math.max(0, parseInt(draft.valuePerWeek,    10) || 0),
+      footfallPerWeek: Math.max(0, parseInt(draft.footfallPerWeek, 10) || 0),
       photo: draft.photo || "", notes: (draft.notes || "").trim(),
       user: true,
     };
@@ -5007,39 +5268,53 @@ async function buildPPT(selectedCampaigns) {
       fontFace: "Calibri", fontSize: 26, color: c.text, bold: true,
     });
 
-    // KPI cards row — moved higher to fill the reclaimed space
-    const kpiY = 1.2, kpiH = 1.3, kpiW = 2.95, kpiGap = 0.15;
+    // Per-campaign aggregated value/footfall — uses the half-share rule:
+    // when both main and overlay tracks are running different campaigns at
+    // the same week, each campaign claims only 50% of that location-week's
+    // weekly value/footfall. Empty other track → 100%.
+    const totals = campaignTotals(camp.id);
+    const fmtMoney = (n) => "$" + Math.round(n).toLocaleString("en-US");
+    const fmtFootfall = (n) => Math.round(n).toLocaleString("en-US");
+
+    // KPI cards — 2 rows of 3, gives breathing room for the longer values.
+    // Row 1: Locations / Weeks Booked / Total Faces
+    // Row 2: Window     / Value Booked / Total Footfall
+    const kpiY1 = 1.15, kpiY2 = 2.35;
+    const kpiH = 1.05, kpiW = 3.95, kpiGap = 0.15, kpiX0 = 0.7;
     const kpis = [
-      { label: "LOCATIONS",   value: String(totalLocs),    accent: c.accent2 },
-      { label: "WEEKS BOOKED", value: String(totalWeeks),  accent: c.mint },
-      { label: "TOTAL FACES",  value: totalFaces.toLocaleString(), accent: c.amber },
-      { label: "WINDOW",       value: weekLabel(earliestWeek) + " → " + weekLabel(latestWeek), accent: c.rose, smallText: true },
+      { row: 0, col: 0, label: "LOCATIONS",      value: String(totalLocs),                                                       accent: c.accent2 },
+      { row: 0, col: 1, label: "WEEKS BOOKED",   value: String(totalWeeks),                                                      accent: c.mint    },
+      { row: 0, col: 2, label: "TOTAL FACES",    value: totalFaces.toLocaleString(),                                             accent: c.amber   },
+      { row: 1, col: 0, label: "WINDOW",         value: weekLabel(earliestWeek) + " → " + weekLabel(latestWeek), smallText: true, accent: c.rose    },
+      { row: 1, col: 1, label: "VALUE BOOKED",   value: fmtMoney(totals.totalValue),                                             accent: c.mint    },
+      { row: 1, col: 2, label: "TOTAL FOOTFALL", value: fmtFootfall(totals.totalFootfall),                                       accent: c.accent2 },
     ];
-    kpis.forEach((k, i) => {
-      const x = 0.7 + i * (kpiW + kpiGap);
+    kpis.forEach((k) => {
+      const x = kpiX0 + k.col * (kpiW + kpiGap);
+      const y = (k.row === 0 ? kpiY1 : kpiY2);
       s1.addShape(pptx.ShapeType.rect, {
-        x: x, y: kpiY, w: kpiW, h: kpiH,
+        x: x, y: y, w: kpiW, h: kpiH,
         fill: { color: c.surf }, line: { color: c.line, width: 0.5 },
         rectRadius: 0.08,
       });
       // Top accent strip
       s1.addShape(pptx.ShapeType.rect, {
-        x: x, y: kpiY, w: kpiW, h: 0.05,
+        x: x, y: y, w: kpiW, h: 0.05,
         fill: { color: k.accent }, line: { color: k.accent },
       });
       s1.addText(k.label, {
-        x: x + 0.25, y: kpiY + 0.18, w: kpiW - 0.5, h: 0.3,
+        x: x + 0.25, y: y + 0.13, w: kpiW - 0.5, h: 0.25,
         fontFace: "Calibri", fontSize: 9, color: c.text3, bold: true, charSpacing: 2,
       });
       s1.addText(k.value, {
-        x: x + 0.25, y: kpiY + 0.5, w: kpiW - 0.5, h: 0.7,
-        fontFace: "Calibri", fontSize: k.smallText ? 18 : 32, color: c.text, bold: true,
+        x: x + 0.25, y: y + 0.4, w: kpiW - 0.5, h: 0.6,
+        fontFace: "Calibri", fontSize: k.smallText ? 16 : 26, color: c.text, bold: true,
         valign: "middle",
       });
     });
 
     // Allocations table header
-    const tblY = 2.85;
+    const tblY = 3.55;
     s1.addText("ALLOCATIONS", {
       x: 0.7, y: tblY, w: 8, h: 0.3,
       fontFace: "Calibri", fontSize: 10, color: c.text3, bold: true, charSpacing: 2,
@@ -5047,6 +5322,11 @@ async function buildPPT(selectedCampaigns) {
 
     // Build the full list of data rows up front (each row = {cells, location})
     // so we can chunk it across multiple slides if it doesn't fit on one.
+    // De-duplication: when a location appears multiple times for this campaign
+    // (e.g. one run on Main + another on Overlay, or two separate runs), we
+    // collapse into ONE row and concatenate the windows in the Window column.
+    // Weeks count + value + footfall are summed (with the half-share rule
+    // already applied via campaignShareAt).
     const headerStyle = {
       fill: { color: c.surfLight }, color: c.text2,
       bold: true, fontSize: 10, fontFace: "Calibri",
@@ -5058,29 +5338,73 @@ async function buildPPT(selectedCampaigns) {
       border: { type: "solid", color: c.line, pt: 0.5 },
       fill: { color: c.surf }, valign: "middle",
     };
-    const dataRows = [];
+
+    // Group runs by location id
+    const byLoc = new Map();
     for (const a of allocs) {
       const L = a.location;
-      const cities = (L.cities || []).join(", ") || L.area || "—";
-      for (const r of a.runs) {
-        dataRows.push({
-          loc: L,
-          cells: [
-            { text: "", options: { ...cellOpts } },   // empty — photo overlaid
-            { text: L.name, options: cellOpts },
-            { text: cities + (L.country ? " · " + L.country : ""), options: { ...cellOpts, color: c.text2 } },
-            { text: L.screen, options: { ...cellOpts, color: c.text2 } },
-            { text: rangeLabel(r.start, r.end), options: { ...cellOpts, color: c.text2 } },
-            { text: String(r.weeks), options: { ...cellOpts, align: "right", bold: true } },
-            { text: L.faces.toLocaleString(), options: { ...cellOpts, align: "right" } },
-          ]
-        });
+      if (!byLoc.has(L.id)) byLoc.set(L.id, { location: L, runs: [] });
+      // Annotate each run with track so we can sort sensibly and (later) detect
+      // tracks if needed. We use start week as the primary sort key.
+      for (const r of a.runs) byLoc.get(L.id).runs.push({ ...r, track: a.track });
+    }
+
+    // For each location: compute weighted value/footfall and concatenated windows
+    const dataRows = [];
+    for (const { location: L, runs } of byLoc.values()) {
+      // Sort runs by start week for a clean "MAR W1–W4, JUL W1–W2" reading order
+      runs.sort((x, y) => x.start - y.start);
+      // Concatenate windows. Two runs on different tracks at the same week
+      // will appear as two ranges in the string ("MAR W1–W4, MAR W1–W4") which
+      // is honest — it shows the location was running on both tracks.
+      const windowText = runs.map(r => rangeLabel(r.start, r.end)).join(", ");
+      const totalWeeksLoc = runs.reduce((s, r) => s + r.weeks, 0);
+
+      // Per-location value/footfall for this campaign — apply half-share rule
+      // by stepping through every week in any of this location's runs.
+      let locValue = 0, locFootfall = 0;
+      const v = L.valuePerWeek || 0;
+      const f = L.footfallPerWeek || 0;
+      if (v > 0 || f > 0) {
+        // Use a Set to avoid double-counting weeks where main + overlay both
+        // run THIS campaign — campaignShareAt for that week returns 1.0 once,
+        // so we only want to count the week once even if multiple runs cover it.
+        const countedWeeks = new Set();
+        for (const r of runs) {
+          for (let w = r.start; w <= r.end; w++) countedWeeks.add(w);
+        }
+        for (const w of countedWeeks) {
+          const share = campaignShareAt(L.id, w, camp.id);
+          locValue    += v * share;
+          locFootfall += f * share;
+        }
       }
+      const cities = (L.cities || []).join(", ") || L.area || "—";
+      const valueText = locValue > 0 ? "$" + Math.round(locValue).toLocaleString("en-US") : "—";
+      const footfallText = locFootfall > 0 ? Math.round(locFootfall).toLocaleString("en-US") : "—";
+
+      dataRows.push({
+        loc: L,
+        cells: [
+          { text: "", options: { ...cellOpts } },                                                  // photo placeholder
+          { text: L.name, options: cellOpts },                                                     // Location
+          { text: cities + (L.country ? " · " + L.country : ""), options: { ...cellOpts, color: c.text2 } },  // Market
+          { text: L.screen, options: { ...cellOpts, color: c.text2 } },                            // Format
+          { text: windowText, options: { ...cellOpts, color: c.text2, fontSize: 9 } },             // Window — slightly smaller so multiple ranges fit
+          { text: String(totalWeeksLoc), options: { ...cellOpts, align: "right", bold: true } },   // Weeks
+          { text: L.faces.toLocaleString(), options: { ...cellOpts, align: "right" } },            // Faces
+          { text: valueText, options: { ...cellOpts, align: "right", color: locValue > 0 ? c.text : c.text3 } },        // Value
+          { text: footfallText, options: { ...cellOpts, align: "right", color: locFootfall > 0 ? c.text : c.text3 } },  // Footfall
+        ]
+      });
     }
 
     // Column widths sum to total table width (W - 1.4 = 11.93 inches).
+    // Old layout had 7 columns; we now have 9 (added Value + Footfall).
+    // Window now needs more room for concatenated ranges; faces gets tighter.
     const totalW = W - 1.4;
-    const colWeights = [0.7, 2.95, 2.85, 1.35, 2.35, 0.9, 0.83];   // sums ~11.93
+    //                  photo  Location  Market  Format  Window  Weeks  Faces  Value  Footfall   sum ≈ 11.93
+    const colWeights = [0.6,   2.4,      2.05,   1.05,   2.55,   0.65,  0.7,   1.0,   1.0];
     const colW = colWeights.slice();
     const tableX = 0.7;
     const rowH = 0.55;
@@ -5092,6 +5416,8 @@ async function buildPPT(selectedCampaigns) {
       { text: "WINDOW",    options: headerStyle },
       { text: "WEEKS",     options: { ...headerStyle, align: "right" } },
       { text: "FACES",     options: { ...headerStyle, align: "right" } },
+      { text: "VALUE",     options: { ...headerStyle, align: "right" } },
+      { text: "FOOTFALL",  options: { ...headerStyle, align: "right" } },
     ];
 
     // Page 1 starts under the KPI cards (tblY); subsequent pages get the full
@@ -5332,6 +5658,10 @@ function bindEvents() {
   document.getElementById("export-ppt").addEventListener("click", openExportPPT);
   document.getElementById("camp-search").addEventListener("input", e => {
     state.campSearch = e.target.value;
+    renderCampaignTable();
+  });
+  document.getElementById("camp-sort").addEventListener("change", e => {
+    state.campSort = e.target.value;
     renderCampaignTable();
   });
   document.getElementById("scroll-left").addEventListener("click", () => {
