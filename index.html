@@ -4873,11 +4873,47 @@ function openLocationEditor(existing) {
       const v = parseFloat(e.target.value);
       draft.valuePerWeek = (isNaN(v) || v < 0) ? 0 : Math.round(v);
     });
-    // Footfall — strip commas/spaces so users can type "3,000" naturally
+    // Footfall — accepts comma-separated input and reformats live as the
+    // user types so they always see "3,000,000" not "3000000". Preserves
+    // cursor position by counting digits before the cursor in the OLD
+    // value, then walking the NEW formatted string to find where that
+    // many digits land. This keeps the caret sitting between the same two
+    // digits before and after the reformat, so adding a digit doesn't
+    // bounce the cursor to the end.
     wrap.querySelector("#lx-footfall").addEventListener("input", e => {
-      const cleaned = String(e.target.value || "").replace(/[\s,]/g, "");
-      const v = parseInt(cleaned, 10);
+      const inp = e.target;
+      const oldValue = inp.value;
+      const oldCaret = inp.selectionStart || 0;
+
+      // Count digits before the cursor in the input as typed
+      let digitsBeforeCursor = 0;
+      for (let i = 0; i < oldCaret; i++) {
+        if (oldValue[i] >= "0" && oldValue[i] <= "9") digitsBeforeCursor++;
+      }
+
+      // Strip everything non-digit to get the clean number
+      const digits = oldValue.replace(/\D/g, "");
+      const v = digits === "" ? 0 : parseInt(digits, 10);
       draft.footfallPerWeek = (isNaN(v) || v < 0) ? 0 : v;
+
+      // Reformat with commas
+      const formatted = digits === "" ? "" : Number(digits).toLocaleString("en-US");
+
+      // Only touch the DOM if the formatted text actually differs — this
+      // avoids unnecessary cursor jumps in the simple case where the user
+      // is just appending digits at the end and no comma was inserted.
+      if (formatted !== oldValue) {
+        inp.value = formatted;
+        // Walk forward through `formatted` until we've passed exactly
+        // digitsBeforeCursor digits — cursor goes there.
+        let newCaret = formatted.length;
+        let count = 0;
+        for (let i = 0; i < formatted.length; i++) {
+          if (count === digitsBeforeCursor) { newCaret = i; break; }
+          if (formatted[i] >= "0" && formatted[i] <= "9") count++;
+        }
+        try { inp.setSelectionRange(newCaret, newCaret); } catch (_) {}
+      }
     });
     wrap.querySelector("#lx-notes").addEventListener("input", e => draft.notes = e.target.value);
 
