@@ -838,14 +838,10 @@
   .dist-name { color: var(--text-2); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .dist-bar-wrap { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 0 8px; min-width: 50px; }
   .dist-bar { height: 100%; border-radius: 2px; transition: width 260ms ease; }
-  .dist-val { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; font-size: 11px; }
-  .dist-val-stack {
-    display: flex; flex-direction: column; align-items: flex-end;
-    font-variant-numeric: tabular-nums; line-height: 1.2;
-    min-width: 70px;
-  }
+  .dist-val { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; min-width: 70px; text-align: right; }
   .dist-val-money { color: var(--text); font-weight: 600; font-size: 12px; }
-  .dist-val-weeks { color: var(--text-3); font-weight: 500; font-size: 10px; margin-top: 2px; }
+  .dist-val-sep { color: var(--text-3); font-weight: 400; }
+  .dist-val-weeks { color: var(--text-3); font-weight: 500; font-size: 11px; }
 
   .empty-state {
     padding: 30px 16px;
@@ -3159,13 +3155,13 @@ function renderKPIs() {
   document.getElementById("kpi-peak").textContent = peak > 0 ? peak.toLocaleString() : "—";
   document.getElementById("kpi-peak-sub").textContent = peak > 0 ? (MONTHS[Math.floor(peakIdx/4)] + " W" + ((peakIdx%4)+1)) : "No allocations yet";
 
-  // Format value as $X with thousands; show "—" if zero rather than "$0"
+  // Format value as $X with K/M suffixes; show "—" if zero rather than "$0"
   document.getElementById("kpi-value").textContent =
-    valuePerWeekTotal > 0 ? "$" + Math.round(valuePerWeekTotal).toLocaleString("en-US") : "—";
+    valuePerWeekTotal > 0 ? "$" + shortNum(valuePerWeekTotal) : "—";
   document.getElementById("kpi-value-sub").textContent = valueSub;
 
   document.getElementById("kpi-footfall").textContent =
-    footfallPerWeekTotal > 0 ? Math.round(footfallPerWeekTotal).toLocaleString("en-US") : "—";
+    footfallPerWeekTotal > 0 ? shortNum(footfallPerWeekTotal) : "—";
   document.getElementById("kpi-footfall-sub").textContent = footfallSub;
 
   document.getElementById("kpi-campaigns").textContent = inPlay;
@@ -3270,16 +3266,20 @@ function renderDistribution() {
     const pct = max > 0 ? (metric / max) * 100 : 0;
     const color = SLOT_COLORS[c.slot] || "#666";
 
-    // Right-side label: weeks count plus $value if any campaign has value data.
-    // Each piece is right-aligned in its own span so columns line up across rows.
+    // Right-side label: when value data exists, show "$X · N wk" inline.
+    // Otherwise just "N wk". Single line keeps row height consistent with the
+    // Weekly Reach Curve panel on the left.
     const weeksLabel = c.weeks + ' wk';
     const valueLabel = c.value > 0
-      ? '$' + Math.round(c.value).toLocaleString("en-US")
+      ? '$' + shortNum(c.value)
       : '';
-    const rightSide = sortByValue || c.value > 0
-      ? '<span class="dist-val-stack">' +
-          '<span class="dist-val-money">' + (valueLabel || '—') + '</span>' +
-          '<span class="dist-val-weeks">' + weeksLabel + '</span>' +
+    const rightSide = (sortByValue || c.value > 0)
+      ? '<span class="dist-val">' +
+          (valueLabel
+            ? '<span class="dist-val-money">' + valueLabel + '</span>' +
+              '<span class="dist-val-sep"> · </span>' +
+              '<span class="dist-val-weeks">' + weeksLabel + '</span>'
+            : '<span class="dist-val-weeks">' + weeksLabel + '</span>') +
         '</span>'
       : '<span class="dist-val">' + weeksLabel + '</span>';
 
@@ -3476,16 +3476,49 @@ function rangeLabel(start, end) {
    fields filled in yet. The boolean `compact` returns a shorter version
    for tight spaces (e.g. mobile chips).
 */
+/* Compact number formatter for tight spaces (Gantt rows, KPI cards).
+   Examples: 999 → "999", 1,234 → "1.23K", 12,500 → "12.5K", 250,543 → "250K",
+   3,000,000 → "3M", 1,250,000 → "1.25M". For 100+ in any range we floor to
+   integer (matches the user's intuition: "250,543" → "250K", not "251K").
+   Trailing zeros after a decimal are stripped so 3.00M → "3M", 12.50K → "12.5K". */
+function shortNum(n) {
+  n = Math.round(Number(n) || 0);
+  if (n < 1000) return String(n);
+  const ranges = [
+    { div: 1e9, suffix: "B" },
+    { div: 1e6, suffix: "M" },
+    { div: 1e3, suffix: "K" },
+  ];
+  for (const r of ranges) {
+    if (n >= r.div) {
+      const v = n / r.div;
+      let s;
+      if (v < 10)       s = v.toFixed(2);
+      else if (v < 100) s = v.toFixed(1);
+      else              s = String(Math.floor(v));   // 250.543 → "250"
+      // Strip dangling decimal zeros: "3.00" → "3", "12.50" → "12.5".
+      // Only when there's actually a decimal point — never strip from plain
+      // integers like "200" (which used to mistakenly become "2").
+      if (s.indexOf(".") !== -1) {
+        s = s.replace(/0+$/, "").replace(/\.$/, "");
+      }
+      return s + r.suffix;
+    }
+  }
+  return String(n);
+}
+
 function formatLocationMeta(L) {
   const parts = [];
   if (L.faces != null) {
     parts.push(L.faces.toLocaleString() + " face" + (L.faces === 1 ? "" : "s"));
   }
   if (L.valuePerWeek && L.valuePerWeek > 0) {
-    parts.push("$" + Number(L.valuePerWeek).toLocaleString("en-US") + "/week");
+    // Compact form for the Gantt — full numbers would crowd the small left rail
+    parts.push("$" + shortNum(L.valuePerWeek) + "/week");
   }
   if (L.footfallPerWeek && L.footfallPerWeek > 0) {
-    parts.push(Number(L.footfallPerWeek).toLocaleString("en-US") + " footfall/week");
+    parts.push(shortNum(L.footfallPerWeek) + " footfall/week");
   }
   return parts.join(", ");
 }
@@ -5627,17 +5660,19 @@ function bindEvents() {
     // will reset it to "all" if so.
     renderCityFilterDropdown();
     syncFiltersToURL();
-    renderKPIs(); renderGantt(); renderMobileList();
+    renderKPIs(); renderChart(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-city").addEventListener("change", e => {
     state.filter.city = e.target.value;
     syncFiltersToURL();
-    renderKPIs(); renderGantt(); renderMobileList();
+    renderKPIs(); renderChart(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-campaign").addEventListener("change", e => {
     state.filter.campaign = e.target.value;
     syncFiltersToURL();
-    renderGantt(); renderMobileList();
+    // Campaign filter affects KPI cards (per-campaign totals, half-share rule)
+    // in addition to the Gantt highlighting.
+    renderKPIs(); renderChart(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-reset").addEventListener("click", () => {
     state.filter = { country: "all", city: "all", campaign: "all" };
