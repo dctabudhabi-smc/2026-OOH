@@ -284,7 +284,7 @@
 
   /* Layout */
   .wrap {
-    max-width: 1600px;
+    max-width: 2400px;
     margin: 0 auto;
     padding: 20px 20px 60px;
   }
@@ -3441,9 +3441,26 @@ function renderGantt() {
 
   const filtered = getFilteredLocations();
 
-  // Determine week width based on viewport
+  // Compute week-cell width adaptively. When there's enough horizontal room
+  // we fit all 40 weeks (no scroll); on narrower screens we fall back to
+  // fixed widths so the grid stays readable but scrolls.
+  // Available time-column width = grid width − location col − track col − a
+  // few pixels for borders.
   const vw = window.innerWidth;
-  const weekW = vw < 640 ? 26 : vw < 1024 ? 32 : 36;
+  const locColW   = vw < 640 ? 185 : 230;
+  const trackColW = vw < 640 ?  24 :  28;
+  const fixedW = vw < 640 ? 26 : vw < 1024 ? 32 : 36;
+  // Measure the grid's container so we know how much we have to work with.
+  // Falls back to viewport-minus-padding if the grid hasn't been laid out yet.
+  const gridContainerW = grid.clientWidth || (vw - 64);
+  const availTime = gridContainerW - locColW - trackColW - 4;
+  const fitted = Math.floor(availTime / WEEK_COUNT);
+  // Use the fitted size if it's at least as big as the minimum readable
+  // cell (28px) — that means we can show all 40 weeks without scroll. Cap
+  // at 60px to avoid absurdly stretched cells on 4K monitors. Otherwise
+  // keep the fixed width and let the time column scroll.
+  const weekW = fitted >= 28 ? Math.min(fitted, 60) : fixedW;
+  const fitsOnScreen = fitted >= 28;
 
   /* --- Column 1: Location meta --- */
   const colLoc = document.createElement("div");
@@ -3566,6 +3583,14 @@ function renderGantt() {
   }
 
   grid.appendChild(colTime);
+
+  // When the grid fits without scrolling, hide the ‹ › buttons and disable
+  // the time column's overflow so there's no phantom scrollbar.
+  const sl = document.getElementById("scroll-left");
+  const sr = document.getElementById("scroll-right");
+  if (sl) sl.style.display = fitsOnScreen ? "none" : "";
+  if (sr) sr.style.display = fitsOnScreen ? "none" : "";
+  colTime.style.overflowX = fitsOnScreen ? "hidden" : "auto";
 }
 
 /* ============================================================
