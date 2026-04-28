@@ -3190,17 +3190,34 @@ function renderKPIs() {
     valueSub = "campaign total";
     footfallSub = "campaign total";
   } else {
-    // Network/geo-scoped mode: snapshot of the filtered inventory
+    // Network/geo-scoped mode — total committed value/footfall across the
+    // year. For each location-week that has at least one campaign on it,
+    // count valuePerWeek (and footfallPerWeek) once. This is exactly equal
+    // to the SUM of every individual campaign's allocation-weighted total
+    // (the half-share rule sums to 1 across concurrent campaigns), which
+    // makes the network number correctly larger than any single campaign's
+    // total — matching the user's mental model.
     locationsCount = filteredLocs.length;
-    facesTotal           = filteredLocs.reduce((a,L) => a + (L.faces || 0), 0);
-    valuePerWeekTotal    = filteredLocs.reduce((a,L) => a + (L.valuePerWeek || 0), 0);
-    footfallPerWeekTotal = filteredLocs.reduce((a,L) => a + (L.footfallPerWeek || 0), 0);
+    facesTotal     = filteredLocs.reduce((a,L) => a + (L.faces || 0), 0);
+
+    let v = 0, f = 0;
+    for (const L of filteredLocs) {
+      const lv = L.valuePerWeek || 0, lf = L.footfallPerWeek || 0;
+      if (!lv && !lf) continue;
+      const m = state.schedule[cellKey(L.id, "main")] || [];
+      const o = state.schedule[cellKey(L.id, "overlay")] || [];
+      for (let w = 0; w < WEEK_COUNT; w++) {
+        if (m[w] || o[w]) { v += lv; f += lf; }
+      }
+    }
+    valuePerWeekTotal = v;
+    footfallPerWeekTotal = f;
 
     locationsLabel = isLocFiltered ? "Locations" : "Total locations";
     locationsSub = geoLabel || "network";
     facesSub = isLocFiltered ? "in selection" : "total network";
-    valueSub = "$ / week";
-    footfallSub = "/ week";
+    valueSub = "across all campaigns";
+    footfallSub = "across all campaigns";
   }
 
   document.getElementById("kpi-locations-label").textContent = locationsLabel;
