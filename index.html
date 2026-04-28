@@ -284,7 +284,7 @@
 
   /* Layout */
   .wrap {
-    max-width: 2400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 20px 20px 60px;
   }
@@ -3456,11 +3456,11 @@ function renderGantt() {
   const availTime = gridContainerW - locColW - trackColW - 4;
   const fitted = Math.floor(availTime / WEEK_COUNT);
   // Use the fitted size if it's at least as big as the minimum readable
-  // cell (28px) — that means we can show all 40 weeks without scroll. Cap
+  // cell (27px) — that means we can show all 40 weeks without scroll. Cap
   // at 60px to avoid absurdly stretched cells on 4K monitors. Otherwise
   // keep the fixed width and let the time column scroll.
-  const weekW = fitted >= 28 ? Math.min(fitted, 60) : fixedW;
-  const fitsOnScreen = fitted >= 28;
+  const weekW = fitted >= 27 ? Math.min(fitted, 60) : fixedW;
+  const fitsOnScreen = fitted >= 27;
 
   /* --- Column 1: Location meta --- */
   const colLoc = document.createElement("div");
