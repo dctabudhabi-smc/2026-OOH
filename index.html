@@ -1411,11 +1411,11 @@
 
   .gantt-grid {
     display: grid;
-    grid-template-columns: 190px 28px 1fr;
+    grid-template-columns: 230px 28px 1fr;
     width: 100%;
   }
   @media (max-width: 640px) {
-    .gantt-grid { grid-template-columns: 160px 24px 1fr; }
+    .gantt-grid { grid-template-columns: 185px 24px 1fr; }
   }
 
   .g-col { overflow: hidden; }
@@ -1451,7 +1451,7 @@
 
   /* Location row */
   .g-loc {
-    height: 72px;
+    height: 80px;
     padding: 10px 12px;
     display: flex; align-items: center; gap: 10px;
     border-bottom: 1px solid var(--line);
@@ -1487,10 +1487,27 @@
   .g-loc-chip.digital { color: var(--accent-2); background: rgba(167,139,250,0.1); }
   .g-loc-chip.static  { color: var(--amber); background: rgba(245,158,11,0.1); }
   .g-loc-chip.indoor  { color: var(--teal); background: rgba(94,234,212,0.1); }
-  .g-loc-faces { font-family: var(--ff-mono); font-size: 9px; color: var(--text-3); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .g-loc-faces {
+    font-family: var(--ff-mono);
+    font-size: 9px;
+    color: var(--text-3);
+    margin-top: 3px;
+    font-variant-numeric: tabular-nums;
+    /* Allow content to wrap onto a second line so "faces, $value, footfall"
+       stays inside the location column without truncating. Cap at 2 lines —
+       any reasonable combination fits, and this guards against editor input
+       breaking the row height. */
+    line-height: 1.35;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+  }
 
   /* Track column */
-  .g-track-cell { height: 36px; display: grid; place-items: center; border-bottom: 1px solid var(--line); }
+  .g-track-cell { height: 40px; display: grid; place-items: center; border-bottom: 1px solid var(--line); }
   .g-track-cell.main { border-bottom: 1px solid var(--line-2); }
   .g-track-cell.dim { opacity: 0.4; }
   .g-track-icon { width: 8px; height: 8px; border-radius: 50%; }
@@ -1502,16 +1519,16 @@
   .g-time-header-sticky { position: sticky; top: 0; z-index: 5; background: var(--bg); }
 
   .g-time-rows { display: flex; flex-direction: column; min-width: fit-content; }
-  /* Lock pair height to exactly match .g-loc (72px + 1px border = 73px) to
+  /* Lock pair height to exactly match .g-loc (80px + 1px border = 81px) to
      prevent row-by-row drift between the location column and the Gantt. */
-  .g-time-row-pair { height: 72px; box-sizing: border-box; border-bottom: 1px solid var(--line); }
-  .g-time-row { display: flex; height: 36px; }
+  .g-time-row-pair { height: 80px; box-sizing: border-box; border-bottom: 1px solid var(--line); }
+  .g-time-row { display: flex; height: 40px; }
   /* Use inset box-shadow instead of border-top so the divider is visible but
      doesn't add 1px to the overlay row's height. */
   .g-time-row.overlay { box-shadow: inset 0 1px 0 var(--line); }
 
   .g-cell {
-    height: 36px;
+    height: 40px;
     border-right: 1px solid var(--line);
     position: relative;
     cursor: pointer;
@@ -3091,56 +3108,97 @@ function renderDate() {
    RENDER — KPIs
    ============================================================ */
 function renderKPIs() {
-  const reach = getReachByWeek();
+  // The KPI cards reflect ALL three filters. We start by computing the
+  // location set under country/city filtering — that's the universe every
+  // metric below operates over. The campaign filter is layered on top.
+  const filteredLocs = getFilteredLocations();
+  const filteredIds = new Set(filteredLocs.map(L => L.id));
+  const isLocFiltered = state.filter.country !== "all" || state.filter.city !== "all";
+
+  // Peak reach — only count weeks where any FILTERED location was running.
+  const reach = Array(WEEK_COUNT).fill(0);
+  for (const L of filteredLocs) {
+    const m = state.schedule[cellKey(L.id, "main")] || [];
+    const o = state.schedule[cellKey(L.id, "overlay")] || [];
+    for (let i = 0; i < WEEK_COUNT; i++) {
+      if (m[i] || o[i]) reach[i] += L.faces;
+    }
+  }
   const peak = Math.max(...reach, 0);
   const peakIdx = reach.indexOf(peak);
-  const usage = getCampaignUsage();
-  const inPlay = Object.values(usage).filter(v=>v>0).length;
 
-  // Two display modes: NETWORK (default — no campaign filter) vs CAMPAIGN
-  // (campaign filter active — show that campaign's allocated totals).
+  // Campaigns in play — count campaigns that have at least one allocation on
+  // any filtered location.
+  const campaignsActive = new Set();
+  for (const L of filteredLocs) {
+    for (const track of ["main", "overlay"]) {
+      const arr = state.schedule[cellKey(L.id, track)] || [];
+      for (const cId of arr) if (cId) campaignsActive.add(cId);
+    }
+  }
+  const inPlay = campaignsActive.size;
+
+  // Two display modes: NETWORK (no campaign filter) vs CAMPAIGN (single
+  // campaign selected). Both apply on top of the country/city filter.
   const filteredCampId = state.filter.campaign && state.filter.campaign !== "all"
     ? state.filter.campaign : null;
   const camp = filteredCampId ? getCampaignById(filteredCampId) : null;
 
-  // Locations / Faces / Value / Footfall calculation
   let locationsCount, facesTotal, valuePerWeekTotal, footfallPerWeekTotal;
   let locationsLabel, locationsSub, facesSub, valueSub, footfallSub;
 
+  // Build a friendly geography label for the sub-line so the user sees the
+  // active geo scope at a glance ("Dubai, UAE", "UAE", or "network").
+  const geoLabel = (() => {
+    if (state.filter.city !== "all" && state.filter.country !== "all") {
+      return state.filter.city + ", " + state.filter.country;
+    }
+    if (state.filter.city !== "all")    return state.filter.city;
+    if (state.filter.country !== "all") return state.filter.country;
+    return null;
+  })();
+
   if (camp) {
-    // Per-campaign mode: only locations + faces actually used by this campaign
+    // Per-campaign mode (intersected with country/city filter):
+    // - locations: filtered locations ACTUALLY USED by this campaign
+    // - value/footfall: half-share rule applied, summed over filtered locs only
     const usedLocs = new Set();
-    for (const L of allLocations()) {
+    for (const L of filteredLocs) {
       for (let w = 0; w < WEEK_COUNT; w++) {
         if (campaignShareAt(L.id, w, camp.id) > 0) { usedLocs.add(L.id); break; }
       }
     }
     locationsCount = usedLocs.size;
     facesTotal = 0;
-    for (const L of allLocations()) {
-      if (usedLocs.has(L.id)) facesTotal += (L.faces || 0);
+    let v = 0, f = 0;
+    for (const L of filteredLocs) {
+      if (!usedLocs.has(L.id)) continue;
+      facesTotal += (L.faces || 0);
+      const lv = L.valuePerWeek || 0, lf = L.footfallPerWeek || 0;
+      if (!lv && !lf) continue;
+      for (let w = 0; w < WEEK_COUNT; w++) {
+        const share = campaignShareAt(L.id, w, camp.id);
+        if (share > 0) { v += lv * share; f += lf * share; }
+      }
     }
-    // Half-share-applied totals across the campaign's footprint
-    const tot = campaignTotals(camp.id);
-    valuePerWeekTotal = tot.totalValue;        // total $ allocated across the schedule
-    footfallPerWeekTotal = tot.totalFootfall;  // total footfall allocated across the schedule
+    valuePerWeekTotal = v;
+    footfallPerWeekTotal = f;
 
     locationsLabel = "Campaign locations";
-    locationsSub = camp.name;
+    locationsSub = camp.name + (geoLabel ? " · " + geoLabel : "");
     facesSub = "in this campaign";
     valueSub = "campaign total";
     footfallSub = "campaign total";
   } else {
-    // Network mode (default): snapshot of the full inventory
-    const all = allLocations();
-    locationsCount = all.length;
-    facesTotal = all.reduce((a,L) => a + (L.faces || 0), 0);
-    valuePerWeekTotal = all.reduce((a,L) => a + (L.valuePerWeek || 0), 0);
-    footfallPerWeekTotal = all.reduce((a,L) => a + (L.footfallPerWeek || 0), 0);
+    // Network/geo-scoped mode: snapshot of the filtered inventory
+    locationsCount = filteredLocs.length;
+    facesTotal           = filteredLocs.reduce((a,L) => a + (L.faces || 0), 0);
+    valuePerWeekTotal    = filteredLocs.reduce((a,L) => a + (L.valuePerWeek || 0), 0);
+    footfallPerWeekTotal = filteredLocs.reduce((a,L) => a + (L.footfallPerWeek || 0), 0);
 
-    locationsLabel = "Total locations";
-    locationsSub = "network";
-    facesSub = "total network";
+    locationsLabel = isLocFiltered ? "Locations" : "Total locations";
+    locationsSub = geoLabel || "network";
+    facesSub = isLocFiltered ? "in selection" : "total network";
     valueSub = "$ / week";
     footfallSub = "/ week";
   }
@@ -3155,7 +3213,6 @@ function renderKPIs() {
   document.getElementById("kpi-peak").textContent = peak > 0 ? peak.toLocaleString() : "—";
   document.getElementById("kpi-peak-sub").textContent = peak > 0 ? (MONTHS[Math.floor(peakIdx/4)] + " W" + ((peakIdx%4)+1)) : "No allocations yet";
 
-  // Format value as $X with K/M suffixes; show "—" if zero rather than "$0"
   document.getElementById("kpi-value").textContent =
     valuePerWeekTotal > 0 ? "$" + shortNum(valuePerWeekTotal) : "—";
   document.getElementById("kpi-value-sub").textContent = valueSub;
@@ -3172,7 +3229,27 @@ function renderKPIs() {
    RENDER — BAR CHART
    ============================================================ */
 function renderChart() {
-  const reach = getReachByWeek();
+  // Filter-aware reach computation. Same pattern as renderKPIs:
+  // - Country/city filter narrows which locations contribute to reach
+  // - Campaign filter narrows to only weeks where THAT campaign is active
+  //   on a filtered location (so the curve shows the campaign's footprint
+  //   over the year, scoped to the geo selection)
+  const filteredLocs = getFilteredLocations();
+  const campId = state.filter.campaign && state.filter.campaign !== "all"
+    ? state.filter.campaign : null;
+
+  const reach = Array(WEEK_COUNT).fill(0);
+  for (const L of filteredLocs) {
+    const m = state.schedule[cellKey(L.id, "main")] || [];
+    const o = state.schedule[cellKey(L.id, "overlay")] || [];
+    for (let i = 0; i < WEEK_COUNT; i++) {
+      const isActive = campId
+        ? (m[i] === campId || o[i] === campId)   // only this campaign's weeks
+        : (!!m[i] || !!o[i]);                    // any allocation
+      if (isActive) reach[i] += L.faces;
+    }
+  }
+
   const max = Math.max(...reach, 1);
   const peak = Math.max(...reach, 0);
   const chart = document.getElementById("bar-chart");
@@ -3222,19 +3299,55 @@ function renderChart() {
 function renderDistribution() {
   const list = document.getElementById("dist-list");
   list.innerHTML = "";
-  const usage = getCampaignUsage();
 
-  // Per-campaign value (with half-share rule). For the default sort we want
-  // highest-value first; if every campaign has $0 (data not yet entered),
-  // fall back to sorting by weeks count so the chart still tells a story.
-  const enriched = state.campaigns.map(c => {
-    const tot = campaignTotals(c.id);
-    return {
-      ...c,
-      weeks: usage[c.id] || 0,
-      value: tot.totalValue,
-    };
-  });
+  // Filter-aware: scope weeks count and value totals to locations matching
+  // the country/city filter. The existing campaignShareAt() reads from the
+  // schedule directly so the half-share rule continues to work correctly
+  // — we just don't sum contributions from out-of-scope locations.
+  const filteredLocs = getFilteredLocations();
+  const filteredLocSet = new Set(filteredLocs.map(L => L.id));
+  const campFilterId = state.filter.campaign && state.filter.campaign !== "all"
+    ? state.filter.campaign : null;
+
+  // Weeks count per campaign — only counting schedule entries that live on
+  // a filtered location.
+  const usage = {};
+  for (const c of state.campaigns) usage[c.id] = 0;
+  for (const L of filteredLocs) {
+    for (const track of ["main", "overlay"]) {
+      const arr = state.schedule[cellKey(L.id, track)] || [];
+      for (const cId of arr) {
+        if (cId && usage[cId] != null) usage[cId]++;
+      }
+    }
+  }
+
+  // Value per campaign with the half-share rule, scoped to filtered locs.
+  const valueOf = (campId) => {
+    let total = 0;
+    for (const L of filteredLocs) {
+      const v = L.valuePerWeek || 0;
+      if (!v) continue;
+      for (let w = 0; w < WEEK_COUNT; w++) {
+        const share = campaignShareAt(L.id, w, campId);
+        if (share > 0) total += v * share;
+      }
+    }
+    return total;
+  };
+
+  // Decide which campaigns to even consider. When the campaign filter is
+  // active, the list collapses to that single campaign — consistent with the
+  // KPI cards which already focus on it. Otherwise rank all campaigns.
+  const candidateCamps = campFilterId
+    ? state.campaigns.filter(c => c.id === campFilterId)
+    : state.campaigns;
+
+  const enriched = candidateCamps.map(c => ({
+    ...c,
+    weeks: usage[c.id] || 0,
+    value: valueOf(c.id),
+  }));
   const totalValueSum = enriched.reduce((a, c) => a + c.value, 0);
   const sortByValue = totalValueSum > 0;
 
@@ -3243,8 +3356,6 @@ function renderDistribution() {
     return b.weeks - a.weeks;
   });
 
-  // Bar lengths scale to whichever metric we're sorting by — that keeps the
-  // visual ranking consistent with the textual ordering.
   const max = sortByValue
     ? Math.max(...sorted.map(c => c.value), 1)
     : Math.max(...sorted.map(c => c.weeks), 1);
@@ -3252,7 +3363,17 @@ function renderDistribution() {
   const topN = sorted.slice(0, 10);
   const inPlay = sorted.filter(c => c.weeks > 0).length;
 
-  document.getElementById("dist-sub").textContent = inPlay + " in play · top 10 shown";
+  // Adapt the sub-line to the active filter scope so the user knows what
+  // they're seeing — "1 campaign" when filtered to one, "N in play · top 10"
+  // when ranking, falling back to "21 in play · top 10 shown".
+  const subEl = document.getElementById("dist-sub");
+  if (campFilterId) {
+    subEl.textContent = "filtered to selection";
+  } else if (state.campaigns.length > 10) {
+    subEl.textContent = inPlay + " in play · top 10 shown";
+  } else {
+    subEl.textContent = inPlay + " in play";
+  }
 
   if (topN.every(c => c.weeks === 0 && c.value === 0)) {
     list.innerHTML = '<div class="empty-state">No campaigns allocated yet.<br><span style="color: var(--text-2); font-size: 11px; margin-top: 4px; display: inline-block;">Click any cell in the Gantt below to start.</span></div>';
@@ -3358,7 +3479,7 @@ function renderGantt() {
     '<div style="height: 50px; border-bottom: 1px solid var(--line-2);"></div>';
   for (const L of filtered) {
     const pair = document.createElement("div");
-    pair.style.cssText = "height: 72px; border-bottom: 1px solid var(--line);";
+    pair.style.cssText = "height: 80px; border-bottom: 1px solid var(--line);";
     const isStatic = L.screen === "Static";
     pair.innerHTML =
       '<div class="g-track-cell main"><span class="g-track-icon main" title="Main track"></span></div>' +
@@ -4760,7 +4881,7 @@ function openLocationEditor(existing) {
           '<div class="field-row">' +
             '<div class="field">' +
               '<label class="field-label" for="lx-value">Value / week ($)</label>' +
-              '<input type="number" min="0" step="1" class="field-input" id="lx-value" placeholder="e.g. 100" value="' + (draft.valuePerWeek || 0) + '">' +
+              '<input type="text" inputmode="numeric" class="field-input" id="lx-value" placeholder="e.g. 100" value="' + (draft.valuePerWeek ? Number(draft.valuePerWeek).toLocaleString("en-US") : "") + '">' +
             '</div>' +
             '<div class="field">' +
               '<label class="field-label" for="lx-footfall">Footfall / week</label>' +
@@ -4868,53 +4989,48 @@ function openLocationEditor(existing) {
       const v = parseInt(e.target.value, 10);
       draft.faces = (isNaN(v) || v < 0) ? 0 : v;
     });
-    // Value (numeric) — straightforward int parse, store as $/week
-    wrap.querySelector("#lx-value").addEventListener("input", e => {
-      const v = parseFloat(e.target.value);
-      draft.valuePerWeek = (isNaN(v) || v < 0) ? 0 : Math.round(v);
-    });
-    // Footfall — accepts comma-separated input and reformats live as the
-    // user types so they always see "3,000,000" not "3000000". Preserves
-    // cursor position by counting digits before the cursor in the OLD
-    // value, then walking the NEW formatted string to find where that
-    // many digits land. This keeps the caret sitting between the same two
-    // digits before and after the reformat, so adding a digit doesn't
-    // bounce the cursor to the end.
-    wrap.querySelector("#lx-footfall").addEventListener("input", e => {
-      const inp = e.target;
-      const oldValue = inp.value;
-      const oldCaret = inp.selectionStart || 0;
+    // Reusable live-comma-formatting helper. Takes the input element + a
+    // setter that receives the parsed integer (0 for empty/invalid). Keeps
+    // the cursor between the same two digits before and after each
+    // reformat so editing in the middle of a number feels natural.
+    const wireCommaInput = (inputEl, setValue) => {
+      inputEl.addEventListener("input", e => {
+        const inp = e.target;
+        const oldValue = inp.value;
+        const oldCaret = inp.selectionStart || 0;
 
-      // Count digits before the cursor in the input as typed
-      let digitsBeforeCursor = 0;
-      for (let i = 0; i < oldCaret; i++) {
-        if (oldValue[i] >= "0" && oldValue[i] <= "9") digitsBeforeCursor++;
-      }
-
-      // Strip everything non-digit to get the clean number
-      const digits = oldValue.replace(/\D/g, "");
-      const v = digits === "" ? 0 : parseInt(digits, 10);
-      draft.footfallPerWeek = (isNaN(v) || v < 0) ? 0 : v;
-
-      // Reformat with commas
-      const formatted = digits === "" ? "" : Number(digits).toLocaleString("en-US");
-
-      // Only touch the DOM if the formatted text actually differs — this
-      // avoids unnecessary cursor jumps in the simple case where the user
-      // is just appending digits at the end and no comma was inserted.
-      if (formatted !== oldValue) {
-        inp.value = formatted;
-        // Walk forward through `formatted` until we've passed exactly
-        // digitsBeforeCursor digits — cursor goes there.
-        let newCaret = formatted.length;
-        let count = 0;
-        for (let i = 0; i < formatted.length; i++) {
-          if (count === digitsBeforeCursor) { newCaret = i; break; }
-          if (formatted[i] >= "0" && formatted[i] <= "9") count++;
+        // Count digits before the cursor in the input as typed
+        let digitsBeforeCursor = 0;
+        for (let i = 0; i < oldCaret; i++) {
+          if (oldValue[i] >= "0" && oldValue[i] <= "9") digitsBeforeCursor++;
         }
-        try { inp.setSelectionRange(newCaret, newCaret); } catch (_) {}
-      }
-    });
+
+        // Strip everything non-digit and update draft
+        const digits = oldValue.replace(/\D/g, "");
+        const v = digits === "" ? 0 : parseInt(digits, 10);
+        setValue((isNaN(v) || v < 0) ? 0 : v);
+
+        // Reformat with commas
+        const formatted = digits === "" ? "" : Number(digits).toLocaleString("en-US");
+
+        // Only touch the DOM if formatting changed (avoids cursor flicker when
+        // appending digits at the end without a new comma being inserted).
+        if (formatted !== oldValue) {
+          inp.value = formatted;
+          // Walk forward through formatted to find where digitsBeforeCursor digits land
+          let newCaret = formatted.length;
+          let count = 0;
+          for (let i = 0; i < formatted.length; i++) {
+            if (count === digitsBeforeCursor) { newCaret = i; break; }
+            if (formatted[i] >= "0" && formatted[i] <= "9") count++;
+          }
+          try { inp.setSelectionRange(newCaret, newCaret); } catch (_) {}
+        }
+      });
+    };
+
+    wireCommaInput(wrap.querySelector("#lx-value"),    n => { draft.valuePerWeek = n; });
+    wireCommaInput(wrap.querySelector("#lx-footfall"), n => { draft.footfallPerWeek = n; });
     wrap.querySelector("#lx-notes").addEventListener("input", e => draft.notes = e.target.value);
 
     // Photo upload
@@ -5696,19 +5812,18 @@ function bindEvents() {
     // will reset it to "all" if so.
     renderCityFilterDropdown();
     syncFiltersToURL();
-    renderKPIs(); renderChart(); renderGantt(); renderMobileList();
+    renderKPIs(); renderChart(); renderDistribution(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-city").addEventListener("change", e => {
     state.filter.city = e.target.value;
     syncFiltersToURL();
-    renderKPIs(); renderChart(); renderGantt(); renderMobileList();
+    renderKPIs(); renderChart(); renderDistribution(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-campaign").addEventListener("change", e => {
     state.filter.campaign = e.target.value;
     syncFiltersToURL();
-    // Campaign filter affects KPI cards (per-campaign totals, half-share rule)
-    // in addition to the Gantt highlighting.
-    renderKPIs(); renderChart(); renderGantt(); renderMobileList();
+    // Campaign filter affects KPIs, chart, distribution AND Gantt highlighting.
+    renderKPIs(); renderChart(); renderDistribution(); renderGantt(); renderMobileList();
   });
   document.getElementById("filter-reset").addEventListener("click", () => {
     state.filter = { country: "all", city: "all", campaign: "all" };
