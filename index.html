@@ -3439,7 +3439,25 @@ function renderGantt() {
   const grid = document.getElementById("gantt-grid");
   grid.innerHTML = "";
 
-  const filtered = getFilteredLocations();
+  let filtered = getFilteredLocations();
+
+  // Campaign filter: hide locations that don't have this campaign running on
+  // either track. Mirrors the country/city behavior so the Gantt only shows
+  // rows the user is interested in. KPIs and the distribution panel are
+  // unaffected — they need the full geo-filtered set so "0 wk" entries
+  // remain accurate.
+  const campId = state.filter.campaign && state.filter.campaign !== "all"
+    ? state.filter.campaign : null;
+  if (campId) {
+    filtered = filtered.filter(L => {
+      const m = state.schedule[cellKey(L.id, "main")] || [];
+      const o = state.schedule[cellKey(L.id, "overlay")] || [];
+      for (let w = 0; w < WEEK_COUNT; w++) {
+        if (m[w] === campId || o[w] === campId) return true;
+      }
+      return false;
+    });
+  }
 
   // Compute week-cell width adaptively. When there's enough horizontal room
   // we fit all 40 weeks (no scroll); on narrower screens we fall back to
@@ -3728,7 +3746,21 @@ function renderMobileList() {
   const container = document.getElementById("mobile-loc-list");
   if (!container) return;
 
-  const filtered = getFilteredLocations();
+  let filtered = getFilteredLocations();
+  // Match the desktop Gantt: when a campaign filter is active, hide
+  // locations that don't have any allocation for that campaign.
+  const campId = state.filter.campaign && state.filter.campaign !== "all"
+    ? state.filter.campaign : null;
+  if (campId) {
+    filtered = filtered.filter(L => {
+      const m = state.schedule[cellKey(L.id, "main")] || [];
+      const o = state.schedule[cellKey(L.id, "overlay")] || [];
+      for (let w = 0; w < WEEK_COUNT; w++) {
+        if (m[w] === campId || o[w] === campId) return true;
+      }
+      return false;
+    });
+  }
   container.innerHTML = "";
 
   if (filtered.length === 0) {
