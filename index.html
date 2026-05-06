@@ -5274,9 +5274,11 @@ function openLocationEditor(existing) {
     const nameEl = wrap.querySelector("#lx-name");
     nameEl.addEventListener("input", e => draft.name = e.target.value);
     nameEl.addEventListener("keydown", e => { if (e.key === "Enter") doSave(); });
-    // Skip autofocus on touch devices to avoid popping the mobile keyboard
-    const hasFinePointer = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
-    if (!isNew && hasFinePointer) nameEl.focus();
+    // Deliberately NOT autofocusing the name field. The editor's render()
+    // is called on every internal change (country switch, blackout
+    // add/remove, photo upload, etc.), and re-focusing would yank scroll
+    // back to the top each time — most painfully when the user is at the
+    // bottom of the modal clicking "Add blackout period".
 
     // Country
     wrap.querySelector("#lx-country").addEventListener("change", e => {
@@ -5394,13 +5396,17 @@ function openLocationEditor(existing) {
     wireCommaInput(wrap.querySelector("#lx-footfall"), n => { draft.footfallPerWeek = n; });
     wrap.querySelector("#lx-notes").addEventListener("input", e => draft.notes = e.target.value);
 
-    // Blackout handlers — re-render the modal on add/remove (so warning
-    // states refresh), but on date change just update the draft + warnings
-    // without re-rendering (which would lose focus on the just-edited input).
+    // Blackout handlers — update ONLY the blackout list HTML when
+    // adding/removing a row. Calling the full render() here would rebuild
+    // the entire modal innerHTML, which resets scroll position to the top.
+    // Annoying when the user is already at the bottom clicking Add.
     const blackoutList = wrap.querySelector("#lx-blackout-list");
+    const refreshBlackoutList = () => {
+      if (blackoutList) blackoutList.innerHTML = renderBlackoutRows();
+    };
     wrap.querySelector("#lx-add-blackout").addEventListener("click", () => {
       draft.blackouts.push({ from: "", to: "" });
-      render();
+      refreshBlackoutList();
     });
     if (blackoutList) {
       blackoutList.addEventListener("click", e => {
@@ -5409,7 +5415,7 @@ function openLocationEditor(existing) {
           const idx = parseInt(removeBtn.dataset.boIdx, 10);
           if (!isNaN(idx)) {
             draft.blackouts.splice(idx, 1);
-            render();
+            refreshBlackoutList();
           }
         }
       });
@@ -5421,9 +5427,7 @@ function openLocationEditor(existing) {
         if (target.classList.contains("lx-bo-from")) draft.blackouts[idx].from = target.value;
         else                                          draft.blackouts[idx].to   = target.value;
         // Refresh just the warnings without nuking focus
-        // We do this by re-rendering only the rows below: cheap, and the
-        // user has already moved off this input (change fires on blur).
-        blackoutList.innerHTML = renderBlackoutRows();
+        refreshBlackoutList();
       });
     }
 
